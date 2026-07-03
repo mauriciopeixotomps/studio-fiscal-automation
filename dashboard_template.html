@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Studio Fiscal — Vendas</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
+<style>
+  :root {
+    --bg: #0b1220;
+    --card: #121a2c;
+    --card-hi: #182238;
+    --border: #22304a;
+    --text: #e2e8f0;
+    --text-dim: #94a3b8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --orange: #f97316;
+    --red: #ef4444;
+    --purple: #a855f7;
+    --yellow: #eab308;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
+  h1 { font-size: 24px; margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 14px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h2 { font-size: 16px; margin: 0 0 16px; color: var(--text); }
+  .card h2 .hint { color: var(--text-dim); font-weight: 400; font-size: 13px; }
+
+  /* ===== Meta / progresso ===== */
+  .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
+  .meta-block { }
+  .meta-block h3 { margin: 0 0 10px; font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+  .meta-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+  .meta-num { font-size: 36px; font-weight: 700; }
+  .meta-num span { font-size: 18px; color: var(--text-dim); font-weight: 400; }
+  .progress-track { flex: 1; min-width: 160px; height: 14px; background: var(--card-hi); border-radius: 8px; overflow: hidden; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 8px; transition: width .4s; }
+  .meta-pace { color: var(--text-dim); font-size: 13px; }
+  .meta-status { font-size: 12px; margin-top: 6px; font-weight: 400; color: var(--text-dim); }
+  .meta-status b { font-weight: 700; color: var(--text); }
+  .meta-status .diff-tag { font-weight: 600; }
+  .meta-status.ahead .diff-tag { color: var(--green); }
+  .meta-status.behind .diff-tag { color: var(--orange); }
+  .meta-futura { font-size: 12px; margin-top: 4px; color: var(--text-dim); }
+  .meta-futura b { color: var(--text); }
+
+  /* ===== Pace por indicador ===== */
+  .pace-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+  .pace-card { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .pace-card .pace-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 2px; }
+  .pace-card .pace-title { font-weight: 700; font-size: 14px; }
+  .pace-card .pace-nums { font-size: 12px; color: var(--text-dim); }
+  .pace-card .pace-nums b { color: var(--text); }
+  .pace-card .pace-chart { height: 130px; }
+  .pace-card .pace-tag { font-size: 10px; color: var(--text-dim); background: var(--card); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
+  .pace-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; flex-wrap: wrap; }
+  .pace-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .pace-legend .sw { width: 14px; height: 0; border-top: 2px solid; display: inline-block; }
+  .pace-legend .sw.dash { border-top-style: dashed; border-top-color: #94a3b8; }
+  .pace-legend b { color: var(--text); font-weight: 700; }
+  .pace-legend .diff-tag { font-weight: 700; }
+  .pace-legend .diff-tag.ahead { color: var(--green); }
+  .pace-legend .diff-tag.behind { color: var(--orange); }
+
+  /* ===== Scoreboard ===== */
+  .scoreboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .score-item { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; }
+  .score-item .lbl { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; }
+  .score-item .val { font-size: 30px; font-weight: 700; margin-top: 6px; }
+  .score-item.green .val { color: var(--green); }
+  .score-item.accent .val { color: var(--accent); }
+  .score-item.orange .val { color: var(--orange); }
+
+  /* ===== Comparativo closers ===== */
+  .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+  .compare-card { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .compare-card .name { font-weight: 700; font-size: 14px; margin-bottom: 10px; }
+  .compare-card .funnel-row { grid-template-columns: 84px 1fr 28px 56px; }
+  .compare-kpis { display: flex; gap: 10px; margin-top: 12px; }
+  .compare-kpis .m { flex: 1; background: var(--card); border-radius: 8px; padding: 6px; text-align: center; }
+  .compare-kpis .m .v { font-size: 15px; font-weight: 700; }
+  .compare-kpis .m .l { font-size: 10px; color: var(--text-dim); }
+
+  /* ===== Perdidos ===== */
+  .lost-summary { display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 16px; }
+  .lost-summary .item { background: var(--card-hi); border-radius: 10px; padding: 12px 18px; }
+  .lost-summary .item .v { font-size: 24px; font-weight: 700; }
+  .lost-summary .item .l { font-size: 12px; color: var(--text-dim); }
+  .lost-split { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px; }
+  .lost-block h4 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; margin: 0 0 12px; }
+  .lost-block.qualificadora h4 { color: var(--red); }
+  .lost-block.expansao h4 { color: var(--orange); }
+  .lost-reasons { display: flex; flex-direction: column; gap: 8px; }
+  .lost-reason-row { display: grid; grid-template-columns: 140px 1fr 30px; align-items: center; gap: 10px; }
+  .lost-reason-row .l { font-size: 13px; color: var(--text-dim); }
+  .lost-reason-track { height: 16px; background: var(--card-hi); border-radius: 6px; overflow: hidden; }
+  .lost-reason-fill { height: 100%; border-radius: 6px; }
+  .lost-block.qualificadora .lost-reason-fill { background: var(--red); }
+  .lost-block.expansao .lost-reason-fill { background: var(--orange); }
+  .lost-reason-row .v { text-align: right; font-weight: 600; font-size: 13px; }
+
+  /* ===== Ranking campanhas/criativos ===== */
+  .ranking-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  .ranking-block h4 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
+  .ranking-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .ranking-list { display: flex; flex-direction: column; gap: 6px; }
+  .ranking-list .rk-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
+  .ranking-list.best .rk-title { color: var(--green); }
+  .ranking-list.worst .rk-title { color: var(--red); }
+  .rk-row { background: var(--card-hi); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .rk-row .rk-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rk-row .rk-nums { color: var(--text-dim); margin-top: 2px; }
+
+  /* ===== KPI grid ===== */
+  .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
+  .kpi { background: var(--card-hi); border-radius: 10px; padding: 14px; text-align: center; }
+  .kpi .val { font-size: 26px; font-weight: 700; }
+  .kpi .lbl { color: var(--text-dim); font-size: 12px; margin-top: 4px; }
+
+  /* ===== Funil ===== */
+  .funnel { display: flex; flex-direction: column; gap: 10px; }
+  .funnel-row { display: grid; grid-template-columns: 140px 1fr 70px 90px; align-items: center; gap: 10px; }
+  .funnel-label { font-size: 13px; color: var(--text-dim); }
+  .funnel-track { height: 22px; background: var(--card-hi); border-radius: 6px; overflow: hidden; }
+  .funnel-fill { height: 100%; border-radius: 6px; background: var(--accent); }
+  .funnel-val { text-align: right; font-weight: 600; }
+  .funnel-conv { text-align: right; font-size: 12px; color: var(--green); }
+
+  /* ===== Relatório por closer ===== */
+  .relatorio-card + .relatorio-card { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+  .relatorio-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .relatorio-head img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent); }
+  .relatorio-head .name { font-weight: 700; font-size: 15px; }
+  .relatorio-tabs { display: flex; gap: 6px; }
+  .relatorio-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin: -10px 0 16px; }
+  .relatorio-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
+  .relatorio-sort select {
+    background: var(--card-hi); border: 1px solid var(--border); color: var(--text);
+    font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; cursor: pointer;
+  }
+  .relatorio-tabs .rtab, .relatorio-sort .rtab {
+    background: var(--card-hi); border: 1px solid var(--border); color: var(--text-dim);
+    font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer;
+  }
+  .relatorio-tabs .rtab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .relatorio-table-wrap { max-height: 340px; overflow-y: auto; }
+  .relatorio-table-wrap table th, .relatorio-table-wrap table td { font-size: 12px; padding: 6px 10px; white-space: nowrap; }
+  .relatorio-table-wrap table th:first-child, .relatorio-table-wrap table td:first-child { position: sticky; left: 0; background: var(--card-hi); }
+
+  /* ===== Tabela previsão ===== */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--text-dim); font-weight: 600; font-size: 12px; text-transform: uppercase; }
+  tr:hover td { background: var(--card-hi); }
+  .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
+  .badge.won { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge.open { background: rgba(148,163,184,.15); color: var(--text-dim); }
+  a.link { color: var(--accent); text-decoration: none; }
+  a.link:hover { text-decoration: underline; }
+
+  .chart-wrap { height: 280px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Studio Fiscal — Equipe de Vendas</h1>
+      <div class="subtitle" id="subtitle"></div>
+    </div>
+  </header>
+
+  <div class="card">
+    <h2>Placar do mês <span class="hint">— com base no preenchimento da planilha de previsão (negócio marcado como Ganho no Pipedrive)</span></h2>
+    <div class="scoreboard">
+      <div class="score-item green">
+        <div class="lbl">Contratos fechados</div>
+        <div class="val" id="score-contratos">0</div>
+      </div>
+      <div class="score-item accent">
+        <div class="lbl">Venda realizada</div>
+        <div class="val" id="score-venda">R$ 0</div>
+      </div>
+      <div class="score-item orange">
+        <div class="lbl">Caixa realizado</div>
+        <div class="val" id="score-caixa">R$ 0</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Metas do mês</h2>
+    <div class="meta-grid">
+      <div class="meta-block">
+        <h3>Leads Studio Fiscal</h3>
+        <div class="meta-row">
+          <div class="meta-num"><span id="meta-leads-atual">0</span> <span>/ <span id="meta-leads-total">0</span></span></div>
+          <div class="progress-track"><div class="progress-fill" id="meta-leads-fill" style="width:0%"></div></div>
+        </div>
+        <div class="meta-pace" id="meta-leads-pace"></div>
+        <div class="meta-status" id="meta-leads-status"></div>
+      </div>
+      <div class="meta-block">
+        <h3>CC1 realizada</h3>
+        <div class="meta-row">
+          <div class="meta-num"><span id="meta-cc1-atual">0</span> <span>/ <span id="meta-cc1-total">0</span></span></div>
+          <div class="progress-track"><div class="progress-fill" id="meta-cc1-fill" style="width:0%"></div></div>
+        </div>
+        <div class="meta-pace" id="meta-cc1-pace"></div>
+        <div class="meta-status" id="meta-cc1-status"></div>
+        <div class="meta-futura" id="meta-cc1-futura"></div>
+      </div>
+      <div class="meta-block">
+        <h3>Contratos fechados</h3>
+        <div class="meta-row">
+          <div class="meta-num"><span id="meta-atual">0</span> <span>/ <span id="meta-total">0</span></span></div>
+          <div class="progress-track"><div class="progress-fill" id="meta-fill" style="width:0%"></div></div>
+        </div>
+        <div class="meta-pace" id="meta-pace"></div>
+        <div class="meta-status" id="meta-contratos-status"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Ritmo por indicador <span class="hint">— acumulado no mês vs. ritmo ideal (reta até a meta, dividida pelos dias úteis)</span></h2>
+    <div class="pace-grid" id="pace-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Consolidado do time <span class="hint">— funil CC1 → FPQ → CC2 → CC3 → Contrato enviado → Fechado</span></h2>
+    <div id="funnel-consolidado" class="funnel"></div>
+  </div>
+
+  <div class="card">
+    <h2>Perdidos <span class="hint">— negócios perdidos no funil Studio Fiscal Franquia no mês</span></h2>
+    <div class="lost-summary">
+      <div class="item"><div class="v" id="lost-total">0</div><div class="l">Total perdidos</div></div>
+      <div class="item"><div class="v" id="lost-qualificadora">0</div><div class="l">Perdidos pela Qualificadora</div></div>
+      <div class="item"><div class="v" id="lost-repasse">0</div><div class="l">Perdidos após repasse ao closer</div></div>
+    </div>
+    <div class="lost-split">
+      <div class="lost-block qualificadora">
+        <h4>Perdidos pela Qualificadora</h4>
+        <div class="lost-reasons" id="lost-reasons-qualificadora"></div>
+      </div>
+      <div class="lost-block expansao">
+        <h4>Perdidos após repasse — Expansão</h4>
+        <div class="lost-reasons" id="lost-reasons-expansao"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Comparativo entre closers <span class="hint">— funil individual de cada closer</span></h2>
+    <div class="compare-grid" id="compare-grid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Ranking de campanhas e criativos <span class="hint">— por CC1 realizada no mês</span></h2>
+    <div class="ranking-grid">
+      <div class="ranking-block">
+        <h4>Campanhas (UTM campaign)</h4>
+        <div class="ranking-cols" id="ranking-campanhas"></div>
+      </div>
+      <div class="ranking-block">
+        <h4>Criativos (UTM content)</h4>
+        <div class="ranking-cols" id="ranking-criativos"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Relatório por closer <span class="hint">— diário, semanal e consolidado do mês</span></h2>
+    <div class="relatorio-toolbar">
+      <div class="relatorio-tabs" id="relatorio-tabs-global">
+        <button class="rtab active" data-period="diario">Diário</button>
+        <button class="rtab" data-period="semanal">Semanal</button>
+        <button class="rtab" data-period="mes">Mês</button>
+      </div>
+      <div class="relatorio-sort">
+        <label for="relatorio-sort-key">Ordenar por</label>
+        <select id="relatorio-sort-key"></select>
+        <button id="relatorio-sort-dir" class="rtab" data-dir="asc" title="Ordem">↑ menor → maior</button>
+      </div>
+    </div>
+    <div id="relatorio-closers"></div>
+  </div>
+
+  <div class="card">
+    <h2>Previsão <span class="hint">— preenchida manualmente pelo time (planilha)</span></h2>
+    <div style="overflow-x:auto">
+      <table id="previsao-table">
+        <thead>
+          <tr>
+            <th>Data registro</th><th>Closer</th><th>Lead</th><th>Modelo</th><th>Bandeira</th>
+            <th>Venda</th><th>Caixa</th><th>Fechamento esperado</th><th>Status</th>
+            <th>Venda realizada</th><th>Caixa realizado</th><th>Deal</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+const D = __DATA_PLACEHOLDER__;
+
+function fmtMoney(v) {
+  if (v === null || v === undefined || isNaN(v)) return '—';
+  return v.toLocaleString('pt-BR', {style:'currency', currency:'BRL', maximumFractionDigits:0});
+}
+function fmtDate(v) {
+  if (!v) return '—';
+  const [y,m,d] = String(v).split('-');
+  return d && m && y ? `${d}/${m}/${y.slice(2)}` : v;
+}
+function pctStr(v) { return (v === null || v === undefined) ? '—' : v + '%'; }
+
+document.getElementById('subtitle').textContent =
+  `${D.mes_label} · ${fmtDate(D.periodo_inicio)} a ${fmtDate(D.periodo_fim)} · atualizado em ${D.gerado_em.replace('T',' ')}`;
+
+// ===== Placar (planilha de previsão) =====
+document.getElementById('score-contratos').textContent = D.scoreboard.contratos_fechados;
+document.getElementById('score-venda').textContent = fmtMoney(D.scoreboard.venda_realizada_total);
+document.getElementById('score-caixa').textContent = fmtMoney(D.scoreboard.caixa_realizado_total);
+
+// ===== Datas do mês (usado pelo pace e pelos gráficos) =====
+const MONTH_DATES = (function() {
+  const start = new Date(D.periodo_inicio + 'T00:00:00');
+  const end = new Date(D.periodo_fim + 'T00:00:00');
+  const out = [];
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    out.push(d.toISOString().slice(0, 10));
+  }
+  return out;
+})();
+const TODAY_ISO = new Date().toISOString().slice(0, 10);
+
+function cumulativeFromDaily(daily) {
+  let cum = 0;
+  return MONTH_DATES.map(iso => { cum += (daily[iso] || 0); return cum; });
+}
+
+// ===== Meta leads =====
+document.getElementById('meta-leads-atual').textContent = D.consolidado.leads;
+document.getElementById('meta-leads-total').textContent = D.meta_leads ?? '—';
+const pctLeads = D.meta_leads ? Math.min(100, 100 * D.consolidado.leads / D.meta_leads) : 0;
+document.getElementById('meta-leads-fill').style.width = pctLeads + '%';
+document.getElementById('meta-leads-pace').textContent =
+  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+// ===== Meta CC1 =====
+document.getElementById('meta-cc1-atual').textContent = D.consolidado.cc1_realizada;
+document.getElementById('meta-cc1-total').textContent = D.pace.cc1.meta ?? '—';
+const pctCC1 = D.pace.cc1.meta ? Math.min(100, 100 * D.consolidado.cc1_realizada / D.pace.cc1.meta) : 0;
+document.getElementById('meta-cc1-fill').style.width = pctCC1 + '%';
+document.getElementById('meta-cc1-pace').textContent =
+  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+document.getElementById('meta-cc1-futura').innerHTML =
+  `<b>${D.consolidado.cc1_futura}</b> para acontecer`;
+
+// ===== Meta contratos =====
+document.getElementById('meta-atual').textContent = D.consolidado.contratos;
+document.getElementById('meta-total').textContent = D.meta_contratos;
+const pctMeta = D.meta_contratos ? Math.min(100, 100 * D.consolidado.contratos / D.meta_contratos) : 0;
+document.getElementById('meta-fill').style.width = pctMeta + '%';
+document.getElementById('meta-pace').textContent =
+  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+function setStatus(elId, key) {
+  const p = D.pace[key];
+  const el = document.getElementById(elId);
+  if (!p.meta) { el.textContent = 'Estimando meta...'; el.className = 'meta-status'; return; }
+  const idealHoje = Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0);
+  const realHoje = cumulativeFromDaily(p.daily)[MONTH_DATES.indexOf(TODAY_ISO)] ?? 0;
+  const diff = realHoje - idealHoje;
+  const diffTxt = Math.abs(diff) < 0.5
+    ? 'no ritmo'
+    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`);
+  el.innerHTML = `Hoje deveria estar em <b>${idealHoje}</b> · está em <b>${realHoje}</b> <span class="diff-tag">(${diffTxt})</span>`;
+  el.className = 'meta-status ' + (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
+}
+setStatus('meta-leads-status', 'leads');
+setStatus('meta-cc1-status', 'cc1');
+setStatus('meta-contratos-status', 'contratos');
+
+// ===== Pace por indicador =====
+const PACE_COLORS = {
+  leads: '#a855f7', cc1: '#22c55e', fpq: '#eab308', cc2: '#3b82f6', cc3: '#ef4444',
+  contrato_enviado: '#06b6d4', contratos: '#f97316',
+};
+const paceLabels = MONTH_DATES.map(iso => iso.slice(8, 10) + '/' + iso.slice(5, 7));
+const TODAY_INDEX = MONTH_DATES.indexOf(TODAY_ISO);
+const WEEK_MONDAY_INDEXES = MONTH_DATES.reduce((acc, iso, i) => {
+  if (new Date(iso + 'T00:00:00').getDay() === 1) acc.push(i);
+  return acc;
+}, []);
+const CHECKPOINT_INDEXES = TODAY_INDEX < 0 ? [] : Array.from(new Set([...WEEK_MONDAY_INDEXES, TODAY_INDEX].filter(i => i >= 0 && i <= TODAY_INDEX))).sort((a, b) => a - b);
+
+function drawCheckpointMarker(ctx, chartArea, scales, data, idx, isToday) {
+  const x = scales.x.getPixelForValue(idx);
+  if (x < chartArea.left || x > chartArea.right) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, chartArea.top);
+  ctx.lineTo(x, chartArea.bottom);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = isToday ? 'rgba(248,250,252,.45)' : 'rgba(148,163,184,.25)';
+  ctx.setLineDash(isToday ? [3, 3] : [2, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (isToday) {
+    ctx.fillStyle = 'rgba(248,250,252,.7)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('hoje', x, chartArea.top - 3);
+  }
+
+  const real = data.datasets[0]?.data?.[idx];
+  const ideal = data.datasets[1]?.data?.[idx];
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 9px sans-serif';
+  if (real !== undefined && real !== null) {
+    const y = scales.y.getPixelForValue(real);
+    ctx.fillStyle = data.datasets[0].borderColor;
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(String(Math.round(real)), x, y - 7);
+  }
+  if (ideal !== undefined && ideal !== null) {
+    const y = scales.y.getPixelForValue(ideal);
+    ctx.fillStyle = '#94a3b8';
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(String(Math.round(ideal)), x, y + 12);
+  }
+  ctx.restore();
+}
+
+const todayLinePlugin = {
+  id: 'todayLine',
+  afterDraw(chart) {
+    const { ctx, chartArea, scales, data } = chart;
+    CHECKPOINT_INDEXES.forEach(idx => drawCheckpointMarker(ctx, chartArea, scales, data, idx, idx === TODAY_INDEX));
+  }
+};
+
+document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => {
+  const color = PACE_COLORS[key] || '#3b82f6';
+  const p = D.pace[key];
+  const realHoje = cumulativeFromDaily(p.daily)[TODAY_INDEX] ?? 0;
+  const idealHoje = p.meta ? Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0) : null;
+  const diff = idealHoje !== null ? realHoje - idealHoje : null;
+  const diffTxt = diff === null ? null : (Math.abs(diff) < 0.5
+    ? 'no ritmo'
+    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`));
+  const diffCls = diff === null ? '' : (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
+  return `
+  <div class="pace-card">
+    <div class="pace-head">
+      <div class="pace-title">${p.label}${p.estimado ? '<span class="pace-tag">estimado</span>' : ''}</div>
+      <div class="pace-nums"><b>${realHoje}</b> ${p.meta ? '/ ' + p.meta : ''}</div>
+    </div>
+    <div class="pace-legend">
+      <span><i class="sw" style="border-top-color:${color}"></i>Realizado hoje <b>${realHoje}</b></span>
+      ${idealHoje !== null ? `<span><i class="sw dash"></i>Ideal hoje <b>${idealHoje}</b></span>` : ''}
+      ${diffTxt !== null ? `<span class="diff-tag ${diffCls}">${diffTxt}</span>` : ''}
+    </div>
+    <div class="pace-chart"><canvas id="pace-canvas-${key}"></canvas></div>
+  </div>
+`;
+}).join('');
+
+Object.keys(D.pace).forEach(key => {
+  const p = D.pace[key];
+  const color = PACE_COLORS[key] || '#3b82f6';
+  const real = cumulativeFromDaily(p.daily);
+  const ideal = p.meta ? MONTH_DATES.map(iso => p.ideal_cumulative[iso] ?? null) : [];
+  const datasets = [
+    { label: 'Realizado', data: real, borderColor: color, backgroundColor: color + '33', tension: .3, pointRadius: 0, fill: true },
+  ];
+  if (p.meta) {
+    datasets.push({ label: 'Ideal', data: ideal, borderColor: '#94a3b8', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
+  }
+  new Chart(document.getElementById(`pace-canvas-${key}`), {
+    type: 'line',
+    data: { labels: paceLabels, datasets },
+    plugins: [todayLinePlugin],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 16, bottom: 4 } },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0, font: { size: 10 } }, grid: { color: '#22304a' } },
+      }
+    }
+  });
+});
+
+// ===== Funil (consolidado e por closer) =====
+function funnelStages(m) {
+  return [
+    ['CC1 realizada', m.cc1_realizada, undefined],
+    ['FPQ recebida', m.fpq_realizada, m.conversao.cc1_para_fpq],
+    ['CC2 realizada', m.cc2_realizada, m.conversao.fpq_para_cc2],
+    ['CC3 realizada', m.cc3_realizada, m.conversao.cc2_para_cc3],
+    ['Contrato enviado', m.contrato_enviado, undefined],
+    ['Fechados (Ganho)', m.contratos, undefined],
+  ];
+}
+function renderFunnel(elId, m) {
+  const stages = funnelStages(m);
+  const max = Math.max(1, ...stages.map(s => s[1]));
+  const el = document.getElementById(elId);
+  el.innerHTML = stages.map(([label, val, conv]) => `
+    <div class="funnel-row">
+      <div class="funnel-label">${label}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${100 * val / max}%"></div></div>
+      <div class="funnel-val">${val}</div>
+      <div class="funnel-conv">${conv === undefined ? '' : 'conv. ' + pctStr(conv)}</div>
+    </div>
+  `).join('');
+}
+renderFunnel('funnel-consolidado', D.consolidado);
+
+// ===== Perdidos =====
+document.getElementById('lost-total').textContent = D.perdidos.total;
+document.getElementById('lost-qualificadora').textContent = D.perdidos.pela_qualificadora;
+document.getElementById('lost-repasse').textContent = D.perdidos.apos_repasse;
+
+function renderLostBlock(elId, field) {
+  const itens = D.perdidos.por_motivo
+    .filter(m => m[field] > 0)
+    .sort((a, b) => b[field] - a[field]);
+  const max = Math.max(1, ...itens.map(m => m[field]));
+  document.getElementById(elId).innerHTML = itens.length
+    ? itens.map(m => `
+        <div class="lost-reason-row">
+          <div class="l">${m.motivo}</div>
+          <div class="lost-reason-track"><div class="lost-reason-fill" style="width:${100 * m[field] / max}%"></div></div>
+          <div class="v">${m[field]}</div>
+        </div>
+      `).join('')
+    : '<div style="color:var(--text-dim);font-size:13px">Nenhum perdido no mês.</div>';
+}
+renderLostBlock('lost-reasons-qualificadora', 'qualificadora');
+renderLostBlock('lost-reasons-expansao', 'expansao');
+
+// ===== Comparativo entre closers (funil individual, mesma linguagem visual do consolidado) =====
+document.getElementById('compare-grid').innerHTML = D.closers.map((c, i) => `
+  <div class="compare-card">
+    <div class="name">${c.nome}</div>
+    <div class="funnel" id="compare-funnel-${i}"></div>
+    <div class="compare-kpis">
+      <div class="m"><div class="v">${c.leads}</div><div class="l">Leads</div></div>
+      <div class="m"><div class="v">${c.contratos}</div><div class="l">Contratos</div></div>
+    </div>
+  </div>
+`).join('');
+D.closers.forEach((c, i) => renderFunnel(`compare-funnel-${i}`, c));
+
+// ===== Ranking campanhas / criativos =====
+function rkRow(i) {
+  return `
+    <div class="rk-row">
+      <div class="rk-name" title="${i.nome}">${i.nome}</div>
+      <div class="rk-nums">${i.cc1} CC1 · ${i.leads} leads${i.conversao !== null ? ' · conv. ' + i.conversao + '%' : ''}</div>
+    </div>`;
+}
+function rkList(items, cls, title) {
+  return `<div class="ranking-list ${cls}"><div class="rk-title">${title}</div>${
+    items.length ? items.map(rkRow).join('') : '<div style="color:var(--text-dim);font-size:12px">Sem dados suficientes</div>'
+  }</div>`;
+}
+document.getElementById('ranking-campanhas').innerHTML =
+  rkList(D.ranking.campanhas.melhores, 'best', 'Melhores') + rkList(D.ranking.campanhas.piores, 'worst', 'Piores');
+document.getElementById('ranking-criativos').innerHTML =
+  rkList(D.ranking.criativos.melhores, 'best', 'Melhores') + rkList(D.ranking.criativos.piores, 'worst', 'Piores');
+
+// ===== Relatório por closer (diário / semanal / mês) =====
+const RELATORIO_METRICS = [
+  ['leads', 'Leads'],
+  ['cc1_realizada', 'CC1 realizada'],
+  ['cc1_futura', 'CC1 a acontecer', true],
+  ['fpq_realizada', 'FPQ recebida'],
+  ['cc2_realizada', 'CC2 realizada'],
+  ['cc2_futura', 'CC2 a acontecer', true],
+  ['cc3_realizada', 'CC3 realizada'],
+  ['cc3_futura', 'CC3 a acontecer', true],
+  ['contrato_enviado', 'Contrato enviado'],
+  ['contratos', 'Contratos fechados'],
+];
+
+function relatorioMondayOf(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  const offset = (d.getDay() + 6) % 7; // 0 = segunda
+  d.setDate(d.getDate() - offset);
+  return d.toISOString().slice(0, 10);
+}
+function relatorioFmtDay(iso) {
+  return new Date(iso + 'T00:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
+}
+function relatorioFmtWeek(mondayIso) {
+  const start = new Date(mondayIso + 'T00:00:00');
+  const end = new Date(start); end.setDate(end.getDate() + 6);
+  const fmt = d => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return `${fmt(start)} – ${fmt(end)}`;
+}
+function relatorioDailyRows(diario) {
+  const days = MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+  return days.map(iso => {
+    const row = { label: relatorioFmtDay(iso) };
+    RELATORIO_METRICS.forEach(([key, , snapshot]) => { row[key] = snapshot ? null : (diario[key] || {})[iso] || 0; });
+    return row;
+  });
+}
+function relatorioWeeklyRows(diario) {
+  const days = MONTH_DATES.filter(d => d <= TODAY_ISO);
+  const weeks = {};
+  days.forEach(iso => {
+    const wk = relatorioMondayOf(iso);
+    if (!weeks[wk]) weeks[wk] = {};
+    RELATORIO_METRICS.forEach(([key, , snapshot]) => {
+      weeks[wk][key] = snapshot ? null : (weeks[wk][key] || 0) + ((diario[key] || {})[iso] || 0);
+    });
+  });
+  return Object.keys(weeks).sort().reverse().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
+}
+function relatorioMonthRow(closer) {
+  const row = { label: 'Mês inteiro' };
+  RELATORIO_METRICS.forEach(([key]) => { row[key] = closer[key] ?? 0; });
+  return [row];
+}
+function relatorioRenderTable(elId, rows) {
+  document.getElementById(elId).innerHTML = `
+    <table>
+      <thead><tr><th>Período</th>${RELATORIO_METRICS.map(([, label]) => `<th>${label}</th>`).join('')}</tr></thead>
+      <tbody>
+        ${rows.length ? rows.map(r => `
+          <tr><td>${r.label}</td>${RELATORIO_METRICS.map(([key]) => `<td>${r[key] === null ? '—' : r[key]}</td>`).join('')}</tr>
+        `).join('') : `<tr><td colspan="${RELATORIO_METRICS.length + 1}" style="color:var(--text-dim)">Sem dados</td></tr>`}
+      </tbody>
+    </table>`;
+}
+
+function relatorioBuildCards(order) {
+  document.getElementById('relatorio-closers').innerHTML = order.map((c, i) => `
+    <div class="relatorio-card">
+      <div class="relatorio-head">
+        <img src="${c.foto}" alt="${c.nome}">
+        <div class="name">${c.nome}</div>
+      </div>
+      <div class="relatorio-table-wrap" id="relatorio-table-${i}"></div>
+    </div>
+  `).join('');
+}
+
+function relatorioRenderPeriod(period, order) {
+  order.forEach((c, i) => {
+    const diario = c.diario || {};
+    let rows;
+    if (period === 'semanal') rows = relatorioWeeklyRows(diario);
+    else if (period === 'mes') rows = relatorioMonthRow(c);
+    else rows = relatorioDailyRows(diario);
+    relatorioRenderTable(`relatorio-table-${i}`, rows);
+  });
+}
+
+let relatorioPeriod = 'diario';
+let relatorioOrder = D.closers.slice();
+
+function relatorioSortedOrder() {
+  const key = document.getElementById('relatorio-sort-key').value;
+  const dir = document.getElementById('relatorio-sort-dir').dataset.dir;
+  const arr = D.closers.slice().sort((a, b) => (a[key] ?? 0) - (b[key] ?? 0));
+  if (dir === 'desc') arr.reverse();
+  return arr;
+}
+
+function relatorioRefresh() {
+  relatorioOrder = relatorioSortedOrder();
+  relatorioBuildCards(relatorioOrder);
+  relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+}
+
+document.getElementById('relatorio-sort-key').innerHTML =
+  RELATORIO_METRICS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('');
+document.getElementById('relatorio-sort-key').value = 'leads';
+document.getElementById('relatorio-sort-key').addEventListener('change', relatorioRefresh);
+
+document.getElementById('relatorio-sort-dir').addEventListener('click', function () {
+  const dir = this.dataset.dir === 'asc' ? 'desc' : 'asc';
+  this.dataset.dir = dir;
+  this.textContent = dir === 'asc' ? '↑ menor → maior' : '↓ maior → menor';
+  relatorioRefresh();
+});
+
+relatorioRefresh();
+
+document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    relatorioPeriod = btn.dataset.period;
+    relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+  });
+});
+
+// ===== Previsão =====
+const tbody = document.querySelector('#previsao-table tbody');
+tbody.innerHTML = D.previsao.map(r => `
+  <tr>
+    <td>${fmtDate(r.data_registro)}</td>
+    <td>${r.closer || '—'}</td>
+    <td>${r.lead || '—'}</td>
+    <td>${r.modelo || '—'}</td>
+    <td>${r.bandeira || '—'}</td>
+    <td>${fmtMoney(r.venda)}</td>
+    <td>${fmtMoney(r.caixa)}</td>
+    <td>${fmtDate(r.data_fechamento_esperada)}</td>
+    <td>${r.deal_status === 'won' ? '<span class="badge won">Ganho</span>' : (r.status || '—')}</td>
+    <td>${fmtMoney(r.venda_realizada)}</td>
+    <td>${fmtMoney(r.caixa_realizado)}</td>
+    <td>${r.deal_link && r.deal_link.startsWith('http') ? `<a class="link" href="${r.deal_link}" target="_blank">abrir</a>` : '—'}</td>
+  </tr>
+`).join('');
+</script>
+</body>
+</html>

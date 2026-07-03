@@ -1,0 +1,36 @@
+name: Atualiza dashboard Studio Fiscal
+
+on:
+  schedule:
+    # 08:00–19:30 BRT (UTC-3) seg-sex, a cada 30 min
+    - cron: '*/30 11-22 * * 1-5'
+    # 20:00 BRT seg-sex (última rodada do dia)
+    - cron: '0 23 * * 1-5'
+    # 18:00 BRT sábado
+    - cron: '0 21 * * 6'
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    env:
+      PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
+      GITHUB_DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instala dependências
+        run: pip install -r requirements.txt
+
+      - name: Fetch Pipedrive
+        run: python fetch_pipedrive.py
+
+      - name: Fetch previsão (planilha)
+        run: python fetch_previsao.py
+
+      - name: Build + deploy
+        run: bash deploy.sh "Auto-update $(date '+%d/%m %H:%M UTC')"

@@ -1,0 +1,6 @@
+data_pipedrive/
+publish/
+__pycache__/
+*.pyc
+.pipedrive_token
+.github_token

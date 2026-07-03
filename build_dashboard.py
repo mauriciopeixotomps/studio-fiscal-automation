@@ -2,7 +2,7 @@
 Lê os xlsx gerados por fetch_pipedrive.py / fetch_previsao.py, agrega métricas
 por closer + consolidado do time, e gera publish/index.html a partir do template.
 """
-import json, os
+import base64, json, os
 from collections import Counter
 from datetime import date, timedelta
 import pandas as pd
@@ -364,6 +364,10 @@ with open(template_path, encoding='utf-8') as f:
 
 html = html.replace('__DATA_PLACEHOLDER__', json.dumps(dashboard, ensure_ascii=False))
 html = html.replace('__MONTH_LABEL__', config.MONTH_LABEL)
+
+with open(os.path.join(WORKDIR, 'logo_studio_fiscal.png'), 'rb') as f:
+    logo_b64 = base64.b64encode(f.read()).decode('ascii')
+html = html.replace('__LOGO_DATA_URI__', f'data:image/png;base64,{logo_b64}')
 
 out_path = os.path.join(PUBLISH_DIR, 'index.html')
 with open(out_path, 'w', encoding='utf-8') as f:

@@ -7,13 +7,14 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 <style>
   :root {
-    --bg: #0b1220;
-    --card: #121a2c;
-    --card-hi: #182238;
-    --border: #22304a;
-    --text: #e2e8f0;
-    --text-dim: #94a3b8;
-    --accent: #3b82f6;
+    --bg: #1f1f1f;
+    --card: #2a2622;
+    --card-hi: #35302a;
+    --border: #47403a;
+    --text: #fdfdfd;
+    --text-dim: #a49b8f;
+    --accent: #d5ae77;
+    --accent-dark: #927245;
     --green: #22c55e;
     --orange: #f97316;
     --red: #ef4444;
@@ -30,7 +31,8 @@
   }
   .wrap { max-width: 1280px; margin: 0 auto; }
   header { display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 24px; }
-  h1 { font-size: 24px; margin: 0 0 4px; }
+  .logo { height: 30px; width: auto; display: block; margin-bottom: 8px; }
+  h1 { font-size: 15px; margin: 0 0 4px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
   .subtitle { color: var(--text-dim); font-size: 14px; }
   .card {
     background: var(--card);
@@ -50,7 +52,7 @@
   .meta-num { font-size: 36px; font-weight: 700; }
   .meta-num span { font-size: 18px; color: var(--text-dim); font-weight: 400; }
   .progress-track { flex: 1; min-width: 160px; height: 14px; background: var(--card-hi); border-radius: 8px; overflow: hidden; }
-  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--green)); border-radius: 8px; transition: width .4s; }
+  .progress-fill { height: 100%; background: linear-gradient(90deg, var(--accent-dark), var(--accent)); border-radius: 8px; transition: width .4s; }
   .meta-pace { color: var(--text-dim); font-size: 13px; }
   .meta-status { font-size: 12px; margin-top: 6px; font-weight: 400; color: var(--text-dim); }
   .meta-status b { font-weight: 700; color: var(--text); }
@@ -72,7 +74,7 @@
   .pace-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; flex-wrap: wrap; }
   .pace-legend span { display: inline-flex; align-items: center; gap: 5px; }
   .pace-legend .sw { width: 14px; height: 0; border-top: 2px solid; display: inline-block; }
-  .pace-legend .sw.dash { border-top-style: dashed; border-top-color: #94a3b8; }
+  .pace-legend .sw.dash { border-top-style: dashed; border-top-color: #a8a29b; }
   .pace-legend b { color: var(--text); font-weight: 700; }
   .pace-legend .diff-tag { font-weight: 700; }
   .pace-legend .diff-tag.ahead { color: var(--green); }
@@ -181,7 +183,8 @@
 <div class="wrap">
   <header>
     <div>
-      <h1>Studio Fiscal — Equipe de Vendas</h1>
+      <img src="__LOGO_DATA_URI__" alt="Studio Fiscal" class="logo">
+      <h1>Equipe de Vendas</h1>
       <div class="subtitle" id="subtitle"></div>
     </div>
   </header>
@@ -448,7 +451,7 @@ function drawCheckpointMarker(ctx, chartArea, scales, data, idx, isToday) {
   }
   if (ideal !== undefined && ideal !== null) {
     const y = scales.y.getPixelForValue(ideal);
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = '#a8a29b';
     ctx.beginPath();
     ctx.arc(x, y, 2.5, 0, Math.PI * 2);
     ctx.fill();
@@ -466,7 +469,7 @@ const todayLinePlugin = {
 };
 
 document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => {
-  const color = PACE_COLORS[key] || '#3b82f6';
+  const color = PACE_COLORS[key] || '#d5ae77';
   const p = D.pace[key];
   const realHoje = cumulativeFromDaily(p.daily)[TODAY_INDEX] ?? 0;
   const idealHoje = p.meta ? Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0) : null;
@@ -493,14 +496,14 @@ document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => 
 
 Object.keys(D.pace).forEach(key => {
   const p = D.pace[key];
-  const color = PACE_COLORS[key] || '#3b82f6';
+  const color = PACE_COLORS[key] || '#d5ae77';
   const real = cumulativeFromDaily(p.daily);
   const ideal = p.meta ? MONTH_DATES.map(iso => p.ideal_cumulative[iso] ?? null) : [];
   const datasets = [
     { label: 'Realizado', data: real, borderColor: color, backgroundColor: color + '33', tension: .3, pointRadius: 0, fill: true },
   ];
   if (p.meta) {
-    datasets.push({ label: 'Ideal', data: ideal, borderColor: '#94a3b8', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
+    datasets.push({ label: 'Ideal', data: ideal, borderColor: '#a8a29b', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
   }
   new Chart(document.getElementById(`pace-canvas-${key}`), {
     type: 'line',
@@ -511,8 +514,8 @@ Object.keys(D.pace).forEach(key => {
       layout: { padding: { top: 16, bottom: 4 } },
       plugins: { legend: { display: false } },
       scales: {
-        x: { ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: '#94a3b8', precision: 0, font: { size: 10 } }, grid: { color: '#22304a' } },
+        x: { ticks: { color: '#a8a29b', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
       }
     }
   });

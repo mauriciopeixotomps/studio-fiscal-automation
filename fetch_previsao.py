@@ -85,6 +85,8 @@ if header_idx is None:
 df = pd.read_csv(io.StringIO('\n'.join(lines[header_idx:])))
 df.columns = [c.strip() for c in df.columns]
 df = df.dropna(how='all')
+# Ignora linha de resumo/total (ex: "TOTAL,,,,,R$ x,R$ y,,,") — só conta linhas com Closer e Lead preenchidos
+df = df[df['Closer'].notna() & df['Lead'].notna()]
 print(f'   {len(df)} linhas de previsão')
 
 col_modelo = next((c for c in df.columns if c.lower() == 'modelo'), None)

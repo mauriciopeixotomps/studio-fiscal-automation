@@ -164,6 +164,9 @@
   .relatorio-table-wrap { max-height: 340px; overflow-y: auto; }
   .relatorio-table-wrap table th, .relatorio-table-wrap table td { font-size: 12px; padding: 6px 10px; white-space: nowrap; }
   .relatorio-table-wrap table th:first-child, .relatorio-table-wrap table td:first-child { position: sticky; left: 0; background: var(--card-hi); }
+  .relatorio-total td { font-weight: 700; color: var(--text); border-top: 2px solid var(--border); background: var(--card); }
+  .relatorio-team { margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--accent); }
+  .relatorio-team .name { color: var(--accent); }
 
   /* ===== Tabela previsão ===== */
   table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -304,6 +307,12 @@
       </div>
     </div>
     <div id="relatorio-closers"></div>
+    <div class="relatorio-card relatorio-team">
+      <div class="relatorio-head">
+        <div class="name">Total da equipe</div>
+      </div>
+      <div class="relatorio-table-wrap" id="relatorio-table-team"></div>
+    </div>
   </div>
 
   <div class="card">
@@ -655,7 +664,43 @@ function relatorioMonthRow(closer) {
   RELATORIO_METRICS.forEach(([key]) => { row[key] = closer[key] ?? 0; });
   return [row];
 }
-function relatorioRenderTable(elId, rows) {
+function relatorioTotalRow(rows) {
+  const row = { label: 'Total' };
+  RELATORIO_METRICS.forEach(([key, , snapshot]) => {
+    row[key] = snapshot ? null : rows.reduce((sum, r) => sum + (r[key] || 0), 0);
+  });
+  return row;
+}
+function relatorioTeamDailyRows() {
+  const days = MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+  return days.map(iso => {
+    const row = { label: relatorioFmtDay(iso) };
+    RELATORIO_METRICS.forEach(([key, , snapshot]) => {
+      row[key] = snapshot ? null : D.closers.reduce((sum, c) => sum + ((c.diario[key] || {})[iso] || 0), 0);
+    });
+    return row;
+  });
+}
+function relatorioTeamWeeklyRows() {
+  const days = MONTH_DATES.filter(d => d <= TODAY_ISO);
+  const weeks = {};
+  days.forEach(iso => {
+    const wk = relatorioMondayOf(iso);
+    if (!weeks[wk]) weeks[wk] = {};
+    RELATORIO_METRICS.forEach(([key, , snapshot]) => {
+      if (snapshot) { weeks[wk][key] = null; return; }
+      const dayTotal = D.closers.reduce((sum, c) => sum + ((c.diario[key] || {})[iso] || 0), 0);
+      weeks[wk][key] = (weeks[wk][key] || 0) + dayTotal;
+    });
+  });
+  return Object.keys(weeks).sort().reverse().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
+}
+function relatorioTeamMonthRow() {
+  const row = { label: 'Mês inteiro' };
+  RELATORIO_METRICS.forEach(([key]) => { row[key] = D.consolidado[key] ?? 0; });
+  return [row];
+}
+function relatorioRenderTable(elId, rows, totalRow) {
   document.getElementById(elId).innerHTML = `
     <table>
       <thead><tr><th>Período</th>${RELATORIO_METRICS.map(([, label]) => `<th>${label}</th>`).join('')}</tr></thead>
@@ -664,6 +709,7 @@ function relatorioRenderTable(elId, rows) {
           <tr><td>${r.label}</td>${RELATORIO_METRICS.map(([key]) => `<td>${r[key] === null ? '—' : r[key]}</td>`).join('')}</tr>
         `).join('') : `<tr><td colspan="${RELATORIO_METRICS.length + 1}" style="color:var(--text-dim)">Sem dados</td></tr>`}
       </tbody>
+      ${totalRow ? `<tfoot><tr class="relatorio-total"><td>${totalRow.label}</td>${RELATORIO_METRICS.map(([key]) => `<td>${totalRow[key] === null ? '—' : totalRow[key]}</td>`).join('')}</tr></tfoot>` : ''}
     </table>`;
 }
 
@@ -682,12 +728,18 @@ function relatorioBuildCards(order) {
 function relatorioRenderPeriod(period, order) {
   order.forEach((c, i) => {
     const diario = c.diario || {};
-    let rows;
-    if (period === 'semanal') rows = relatorioWeeklyRows(diario);
-    else if (period === 'mes') rows = relatorioMonthRow(c);
-    else rows = relatorioDailyRows(diario);
-    relatorioRenderTable(`relatorio-table-${i}`, rows);
+    let rows, totalRow;
+    if (period === 'semanal') { rows = relatorioWeeklyRows(diario); totalRow = relatorioTotalRow(rows); }
+    else if (period === 'mes') { rows = relatorioMonthRow(c); totalRow = null; }
+    else { rows = relatorioDailyRows(diario); totalRow = relatorioTotalRow(rows); }
+    relatorioRenderTable(`relatorio-table-${i}`, rows, totalRow);
   });
+
+  let teamRows, teamTotal;
+  if (period === 'semanal') { teamRows = relatorioTeamWeeklyRows(); teamTotal = relatorioTotalRow(teamRows); }
+  else if (period === 'mes') { teamRows = relatorioTeamMonthRow(); teamTotal = null; }
+  else { teamRows = relatorioTeamDailyRows(); teamTotal = relatorioTotalRow(teamRows); }
+  relatorioRenderTable('relatorio-table-team', teamRows, teamTotal);
 }
 
 let relatorioPeriod = 'diario';

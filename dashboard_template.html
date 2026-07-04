@@ -335,6 +335,7 @@
           </tr>
         </thead>
         <tbody></tbody>
+        <tfoot></tfoot>
       </table>
     </div>
   </div>
@@ -821,6 +822,26 @@ tbody.innerHTML = D.previsao.map(r => `
     <td>${r.deal_link && r.deal_link.startsWith('http') ? `<a class="link" href="${r.deal_link}" target="_blank">abrir</a>` : '—'}</td>
   </tr>
 `).join('');
+
+const previsaoTotais = D.previsao.reduce((acc, r) => {
+  acc.venda += r.venda || 0;
+  acc.caixa += r.caixa || 0;
+  acc.venda_realizada += r.venda_realizada || 0;
+  acc.caixa_realizado += r.caixa_realizado || 0;
+  return acc;
+}, { venda: 0, caixa: 0, venda_realizada: 0, caixa_realizado: 0 });
+document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? `
+  <tr class="relatorio-total">
+    <td colspan="5">Total (${D.previsao.length} negócio${D.previsao.length === 1 ? '' : 's'})</td>
+    <td>${fmtMoney(previsaoTotais.venda)}</td>
+    <td>${fmtMoney(previsaoTotais.caixa)}</td>
+    <td></td>
+    <td></td>
+    <td>${fmtMoney(previsaoTotais.venda_realizada)}</td>
+    <td>${fmtMoney(previsaoTotais.caixa_realizado)}</td>
+    <td></td>
+  </tr>
+` : '';
 </script>
 </body>
 </html>

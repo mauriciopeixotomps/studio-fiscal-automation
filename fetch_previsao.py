@@ -91,6 +91,7 @@ print(f'   {len(df)} linhas de previsão')
 
 col_modelo = next((c for c in df.columns if c.lower() == 'modelo'), None)
 col_bandeira = next((c for c in df.columns if c.lower() == 'bandeira'), None)
+col_confianca = next((c for c in df.columns if c.lower() in ('confiança', 'confianca', 'termômetro', 'termometro')), None)
 
 rows = []
 for _, r in df.iterrows():
@@ -126,6 +127,7 @@ for _, r in df.iterrows():
         'lead': r.get('Lead'),
         'modelo': r.get(col_modelo) if col_modelo else None,
         'bandeira': r.get(col_bandeira) if col_bandeira else None,
+        'confianca': r.get(col_confianca) if col_confianca else None,
         'venda': _parse_valor(r.get('Venda')),
         'caixa': _parse_valor(r.get('Caixa')),
         'data_fechamento_esperada': _parse_data(r.get('Data fechamento Esperada')),
@@ -143,6 +145,6 @@ n_realizados = df_out['venda_realizada'].notna().sum()
 print(f'   {n_realizados} negócios já Ganhos (venda/caixa realizado preenchido)')
 print(f'Salvo em {OUT_DIR}/previsao.xlsx')
 
-if not col_modelo or not col_bandeira:
-    faltando = [n for n, c in (('Modelo', col_modelo), ('Bandeira', col_bandeira)) if not c]
+if not col_modelo or not col_bandeira or not col_confianca:
+    faltando = [n for n, c in (('Modelo', col_modelo), ('Bandeira', col_bandeira), ('Confiança', col_confianca)) if not c]
     print(f'   AVISO: coluna(s) {faltando} ainda não existem na planilha — ficarão em branco até serem adicionadas.')

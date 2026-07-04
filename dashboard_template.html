@@ -181,6 +181,10 @@
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
   .badge.won { background: rgba(34,197,94,.15); color: var(--green); }
   .badge.open { background: rgba(148,163,184,.15); color: var(--text-dim); }
+  .badge.confianca-confiante { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge.confianca-quente { background: rgba(213,174,119,.18); color: var(--accent); }
+  .badge.confianca-morno { background: rgba(249,115,22,.15); color: var(--orange); }
+  .badge.confianca-em-duvida { background: rgba(239,68,68,.15); color: var(--red); }
   a.link { color: var(--accent); text-decoration: none; }
   a.link:hover { text-decoration: underline; }
 
@@ -329,7 +333,7 @@
       <table id="previsao-table">
         <thead>
           <tr>
-            <th>Data registro</th><th>Closer</th><th>Lead</th><th>Modelo</th><th>Bandeira</th>
+            <th>Data registro</th><th>Closer</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th>
             <th>Venda</th><th>Caixa</th><th>Fechamento esperado</th><th>Status</th>
             <th>Venda realizada</th><th>Caixa realizado</th><th>Deal</th>
           </tr>
@@ -805,6 +809,17 @@ document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(btn => {
 });
 
 // ===== Previsão =====
+function confiancaBadge(v) {
+  if (!v) return '—';
+  const norm = v.toString().trim().toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, ''); // remove acentos
+  const cls = norm.includes('duvida') ? 'em-duvida'
+    : norm.includes('confiante') ? 'confiante'
+    : norm.includes('quente') ? 'quente'
+    : norm.includes('morno') ? 'morno'
+    : null;
+  return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
+}
 const tbody = document.querySelector('#previsao-table tbody');
 tbody.innerHTML = D.previsao.map(r => `
   <tr>
@@ -813,6 +828,7 @@ tbody.innerHTML = D.previsao.map(r => `
     <td>${r.lead || '—'}</td>
     <td>${r.modelo || '—'}</td>
     <td>${r.bandeira || '—'}</td>
+    <td>${confiancaBadge(r.confianca)}</td>
     <td>${fmtMoney(r.venda)}</td>
     <td>${fmtMoney(r.caixa)}</td>
     <td>${fmtDate(r.data_fechamento_esperada)}</td>
@@ -832,7 +848,7 @@ const previsaoTotais = D.previsao.reduce((acc, r) => {
 }, { venda: 0, caixa: 0, venda_realizada: 0, caixa_realizado: 0 });
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? `
   <tr class="relatorio-total">
-    <td colspan="5">Total (${D.previsao.length} negócio${D.previsao.length === 1 ? '' : 's'})</td>
+    <td colspan="6">Total (${D.previsao.length} negócio${D.previsao.length === 1 ? '' : 's'})</td>
     <td>${fmtMoney(previsaoTotais.venda)}</td>
     <td>${fmtMoney(previsaoTotais.caixa)}</td>
     <td></td>

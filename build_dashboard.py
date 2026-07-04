@@ -34,6 +34,11 @@ deals = load('deals.xlsx')
 deals_p62 = load('deals_pipeline62.xlsx')
 previsao = load('previsao.xlsx')
 
+if not deals.empty:
+    deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+if not deals_p62.empty:
+    deals_p62 = deals_p62[~deals_p62['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+
 if not os.path.exists(os.path.join(WORKDIR, config.METAS_FILE)):
     raise RuntimeError(
         f'Arquivo de meta "{config.METAS_FILE}" não existe — crie um novo com a meta de '

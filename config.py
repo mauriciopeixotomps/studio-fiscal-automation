@@ -74,6 +74,12 @@ CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'
 CF_UTM_CAMPAIGN = 'ee93fbc62c1804b82721486630058f3467651cec'
 CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 
+# ============= NEGÓCIOS EXCLUÍDOS =============
+# deal_id que aparece com um dos 4 closers como "owner" no Pipedrive, mas que o time
+# confirmou não ser deles de fato (ex: negócio do Émerson, de outra equipe, mal
+# atribuído no Pipedrive). Excluído de leads/contratos por closer e do consolidado.
+DEALS_EXCLUIDOS = {57206}
+
 # ============= CONVERSÃO DE REFERÊNCIA (quadro do time, "conta pra cada contrato") =============
 # 100 leads -> 15 CC1 realizada -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 contrato fechado.
 # Usado pra estimar as metas de CC1/FPQ/CC2/CC3 em cascata a partir da meta de leads,

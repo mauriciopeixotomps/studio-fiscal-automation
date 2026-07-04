@@ -58,12 +58,14 @@ ACT_CONTRATO_ENVIADO = 'contrato_enviado'  # id 11 — Contrato enviado
 
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 
-# Estágios do pipeline 62 que ainda pertencem à Qualificadora (SDR) — antes do
-# repasse pro closer. Confirmado com o time (etapas de qualificação vs. etapas do
-# closer) e via IDs reais do pipeline 62: repasse acontece na transição de MQL
-# FRANQUIA (596, CC1 pode ou não estar agendada) pra AGUARDANDO FPQ (597, CC1 já
-# realizada) — a primeira etapa do closer.
-PIPELINE62_QUALIFICADORA_STAGES = {593, 594, 595, 596}  # LEAD, PRÉ-QUALIFICAÇÃO, EM ATENDIMENTO, MQL FRANQUIA
+# Etapas do pipeline 62, pra referência (IDs reais, confirmados com o time):
+# 593 LEAD, 594 PRÉ-QUALIFICAÇÃO, 595 EM ATENDIMENTO, 596 MQL FRANQUIA (qualificação,
+# CC1 pode ou não estar agendada) -> 597 AGUARDANDO FPQ (CC1 realizada, 1ª etapa do
+# closer), 598 OPORTUNIDADE (FPQ recebida), 599 OPORTUNIDADE QUENTE (CC2 agendada),
+# 600 PROPOSTA (CC2 realizada), 601 NEGOCIAÇÃO, 602 ADITIVO JURIDICO, 603 CONTRATO
+# ENVIADO. Repasse não é definido pela etapa (o closer às vezes faz a CC1 e já marca
+# como perdido ainda em MQL FRANQUIA) — quem perdeu o negócio (owner_id) é que decide
+# se foi a Qualificadora (SDR) ou a Expansão (um dos 4 closers). Ver build_dashboard.py.
 
 # Campo customizado de negócio: Valor de Caixa (Entrada + Taxa)
 CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'

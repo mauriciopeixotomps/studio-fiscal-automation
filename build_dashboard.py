@@ -270,7 +270,11 @@ if not deals_p62.empty:
     dl['lost_time'] = pd.to_datetime(dl['lost_time'], errors='coerce').dt.date
     dl = dl[(dl['lost_time'] >= config.MONTH_START) & (dl['lost_time'] <= config.MONTH_END)]
     perdidos['total'] = int(len(dl))
-    dl['pela_qualificadora'] = dl['stage_id'].isin(config.PIPELINE62_QUALIFICADORA_STAGES)
+    # Quem perdeu o negócio define a atribuição, não a etapa em que ele estava —
+    # o closer às vezes faz a CC1 e já marca como perdido ainda na etapa de MQL
+    # (Qualificadora), então a etapa sozinha classificaria errado. Se o dono do
+    # negócio é um dos 4 closers, é perdido pela Expansão; senão, é SDR/Qualificadora.
+    dl['pela_qualificadora'] = ~dl['owner_id'].isin(config.CLOSER_IDS)
     perdidos['pela_qualificadora'] = int(dl['pela_qualificadora'].sum())
     perdidos['apos_repasse'] = perdidos['total'] - perdidos['pela_qualificadora']
     dl['motivo'] = dl['lost_reason'].fillna('Não informado').replace('', 'Não informado')

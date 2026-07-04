@@ -59,9 +59,11 @@ ACT_CONTRATO_ENVIADO = 'contrato_enviado'  # id 11 — Contrato enviado
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 
 # Estágios do pipeline 62 que ainda pertencem à Qualificadora (SDR) — antes do
-# repasse pro closer. Confirmado via dados reais: todo negócio perdido em Jul/2026
-# nesse pipeline estava num desses 3 estágios (nenhum chegou em MQL FRANQUIA+).
-PIPELINE62_QUALIFICADORA_STAGES = {593, 594, 595}  # LEAD, PRÉ-QUALIFICAÇÃO, EM ATENDIMENTO
+# repasse pro closer. Confirmado com o time (etapas de qualificação vs. etapas do
+# closer) e via IDs reais do pipeline 62: repasse acontece na transição de MQL
+# FRANQUIA (596, CC1 pode ou não estar agendada) pra AGUARDANDO FPQ (597, CC1 já
+# realizada) — a primeira etapa do closer.
+PIPELINE62_QUALIFICADORA_STAGES = {593, 594, 595, 596}  # LEAD, PRÉ-QUALIFICAÇÃO, EM ATENDIMENTO, MQL FRANQUIA
 
 # Campo customizado de negócio: Valor de Caixa (Entrada + Taxa)
 CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'

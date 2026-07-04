@@ -215,24 +215,17 @@ def ideal_cumulative(meta, dias_uteis_total):
 
 
 # Metas explícitas: leads (informada pelo time) e contratos (metas_*.json).
-# Metas de CC1/FPQ/CC2/CC3 são estimadas em cascata a partir da meta de leads
-# usando a conversão real do mês corrente (ficam em branco até haver leads/dados
-# suficientes pra calcular a conversão).
+# Metas de CC1/FPQ/CC2/CC3 são estimadas em cascata a partir da meta de leads,
+# usando a conversão de referência do time (config.BENCHMARK_*, "conta pra cada
+# contrato": 100 leads -> 15 CC1 -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 fechado) em vez
+# da conversão real do mês — que é instável/ruidosa no início do mês, com poucos dados.
+# Contrato enviado não está nesse quadro de referência, então continua estimado pela
+# conversão real do mês (CC3 -> Contrato enviado).
 meta_leads = metas.get('meta_leads')
-leads_para_cc1 = pct(consolidado['cc1_realizada'], consolidado['leads'])
-meta_cc1_calc = round(meta_leads * leads_para_cc1 / 100) if meta_leads and leads_para_cc1 else None
-meta_fpq_calc = (
-    round(meta_cc1_calc * consolidado['conversao']['cc1_para_fpq'] / 100)
-    if meta_cc1_calc and consolidado['conversao']['cc1_para_fpq'] else None
-)
-meta_cc2_calc = (
-    round(meta_fpq_calc * consolidado['conversao']['fpq_para_cc2'] / 100)
-    if meta_fpq_calc and consolidado['conversao']['fpq_para_cc2'] else None
-)
-meta_cc3_calc = (
-    round(meta_cc2_calc * consolidado['conversao']['cc2_para_cc3'] / 100)
-    if meta_cc2_calc and consolidado['conversao']['cc2_para_cc3'] else None
-)
+meta_cc1_calc = round(meta_leads * config.BENCHMARK_LEADS_PARA_CC1) if meta_leads else None
+meta_fpq_calc = round(meta_cc1_calc * config.BENCHMARK_CC1_PARA_FPQ) if meta_cc1_calc else None
+meta_cc2_calc = round(meta_fpq_calc * config.BENCHMARK_FPQ_PARA_CC2) if meta_fpq_calc else None
+meta_cc3_calc = round(meta_cc2_calc * config.BENCHMARK_CC2_PARA_CC3) if meta_cc2_calc else None
 cc3_para_contrato_enviado = pct(consolidado['contrato_enviado'], consolidado['cc3_realizada'])
 meta_contrato_enviado_calc = (
     round(meta_cc3_calc * cc3_para_contrato_enviado / 100)

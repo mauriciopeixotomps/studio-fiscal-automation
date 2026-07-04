@@ -70,6 +70,17 @@ CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'
 CF_UTM_CAMPAIGN = 'ee93fbc62c1804b82721486630058f3467651cec'
 CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 
+# ============= CONVERSÃO DE REFERÊNCIA (quadro do time, "conta pra cada contrato") =============
+# 100 leads -> 15 CC1 realizada -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 contrato fechado.
+# Usado pra estimar as metas de CC1/FPQ/CC2/CC3 em cascata a partir da meta de leads,
+# em vez da conversão real do mês corrente (que fica instável/ruidosa no início do mês,
+# com poucos dados). Contrato enviado não está no quadro — continua sendo estimado pela
+# conversão real do mês (CC3 -> Contrato enviado).
+BENCHMARK_LEADS_PARA_CC1 = 15 / 100
+BENCHMARK_CC1_PARA_FPQ = 8 / 15
+BENCHMARK_FPQ_PARA_CC2 = 4 / 8
+BENCHMARK_CC2_PARA_CC3 = 2 / 4
+
 # ============= META =============
 # Um arquivo de metas por mês (mesmo padrão do projeto Qualificadora) — criar um novo
 # metas_AAAA_MM.json todo mês com a meta de contratos daquele mês.

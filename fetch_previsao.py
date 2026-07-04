@@ -108,6 +108,14 @@ for _, r in df.iterrows():
             if deal_status == 'won':
                 venda_realizada = d.get('value')
                 caixa_realizado = d.get(config.CF_CAIXA)
+    else:
+        # Sem link válido do Pipedrive (célula tem nome/e-mail em vez da URL) —
+        # usa o status preenchido manualmente na planilha como fallback.
+        status_texto = str(r.get('Satus') or r.get('Status') or '').strip().lower()
+        if 'fechado' in status_texto or 'ganho' in status_texto:
+            deal_status = 'won'
+            venda_realizada = _parse_valor(r.get('Venda'))
+            caixa_realizado = _parse_valor(r.get('Caixa'))
 
     rows.append({
         'data_registro': _parse_data(r.get('DATA DO REGISTRO')),

@@ -812,8 +812,8 @@ function confiancaBadge(v) {
   if (!v) return '—';
   const norm = v.toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, ''); // remove acentos
-  const cls = norm.includes('duvida') ? 'em-duvida'
-    : norm.includes('confiante') ? 'confiante'
+  const cls = norm.includes('duvid') ? 'em-duvida'
+    : (norm.includes('confia') || norm.includes('fechad')) ? 'confiante'
     : norm.includes('quente') ? 'quente'
     : norm.includes('morno') ? 'morno'
     : null;

@@ -23,7 +23,7 @@ if not TOKEN:
     raise RuntimeError('PIPEDRIVE_TOKEN não encontrado (env var ou .pipedrive_token)')
 
 BASE = 'https://api.pipedrive.com/v1'
-DEAL_LINK_RE = re.compile(r'/deal/(\d+)')
+DEAL_LINK_RE = re.compile(r'https?://([^/\s]+)/deal/(\d+)')
 
 
 def _closer_key(nome_planilha):
@@ -96,7 +96,10 @@ rows = []
 for _, r in df.iterrows():
     link = str(r.get('Link do pipe') or '')
     m = DEAL_LINK_RE.search(link)
-    deal_id = int(m.group(1)) if m else None
+    deal_id = int(m.group(2)) if m else None
+    # Reconstrói um link limpo a partir do domínio/id extraídos, evitando URLs de
+    # redirecionamento do Google (que às vezes envolvem o link real quando colado no Sheets).
+    clean_link = f'https://{m.group(1)}/deal/{m.group(2)}' if m else None
 
     venda_realizada = None
     caixa_realizado = None
@@ -128,7 +131,7 @@ for _, r in df.iterrows():
         'data_fechamento_esperada': _parse_data(r.get('Data fechamento Esperada')),
         'status': r.get('Satus') or r.get('Status'),
         'deal_id': deal_id,
-        'deal_link': link if link and link != 'nan' else None,
+        'deal_link': clean_link or (link if link and link != 'nan' else None),
         'deal_status': deal_status,
         'venda_realizada': venda_realizada,
         'caixa_realizado': caixa_realizado,

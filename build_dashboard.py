@@ -339,6 +339,9 @@ scoreboard = {
     'contratos_fechados': sum(1 for r in previsao_out if r.get('venda_realizada') is not None),
     'venda_realizada_total': sum(r.get('venda_realizada') or 0 for r in previsao_out),
     'caixa_realizado_total': sum(r.get('caixa_realizado') or 0 for r in previsao_out),
+    'contratos_previstos': len(previsao_out),
+    'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_out),
+    'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_out),
 }
 
 dashboard = {

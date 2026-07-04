@@ -88,6 +88,11 @@
   .score-item.green .val { color: var(--green); }
   .score-item.accent .val { color: var(--accent); }
   .score-item.orange .val { color: var(--orange); }
+  .score-sub { font-size: 12px; color: var(--text-dim); margin-top: 6px; }
+  .score-sub b { color: var(--text); font-weight: 700; }
+  .score-sub .falta { font-weight: 600; }
+  .score-sub .falta.pendente { color: var(--orange); }
+  .score-sub .falta.completo { color: var(--green); }
 
   /* ===== Comparativo closers ===== */
   .compare-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
@@ -198,14 +203,17 @@
       <div class="score-item green">
         <div class="lbl">Contratos fechados</div>
         <div class="val" id="score-contratos">0</div>
+        <div class="score-sub" id="score-contratos-sub"></div>
       </div>
       <div class="score-item accent">
         <div class="lbl">Venda realizada</div>
         <div class="val" id="score-venda">R$ 0</div>
+        <div class="score-sub" id="score-venda-sub"></div>
       </div>
       <div class="score-item orange">
         <div class="lbl">Caixa realizado</div>
         <div class="val" id="score-caixa">R$ 0</div>
+        <div class="score-sub" id="score-caixa-sub"></div>
       </div>
     </div>
   </div>
@@ -350,9 +358,22 @@ document.getElementById('subtitle').textContent =
   `${D.mes_label} · ${fmtDate(D.periodo_inicio)} a ${fmtDate(D.periodo_fim)} · atualizado em ${D.gerado_em.replace('T',' ')}`;
 
 // ===== Placar (planilha de previsão) =====
+function scoreSubHtml(previsto, realizado, fmt) {
+  const falta = previsto - realizado;
+  const faltaTxt = falta <= 0
+    ? `<span class="falta completo">previsto batido</span>`
+    : `faltam <span class="falta pendente">${fmt(falta)}</span>`;
+  return `Previsto <b>${fmt(previsto)}</b> · ${faltaTxt}`;
+}
 document.getElementById('score-contratos').textContent = D.scoreboard.contratos_fechados;
 document.getElementById('score-venda').textContent = fmtMoney(D.scoreboard.venda_realizada_total);
 document.getElementById('score-caixa').textContent = fmtMoney(D.scoreboard.caixa_realizado_total);
+document.getElementById('score-contratos-sub').innerHTML =
+  scoreSubHtml(D.scoreboard.contratos_previstos, D.scoreboard.contratos_fechados, v => v);
+document.getElementById('score-venda-sub').innerHTML =
+  scoreSubHtml(D.scoreboard.venda_prevista_total, D.scoreboard.venda_realizada_total, fmtMoney);
+document.getElementById('score-caixa-sub').innerHTML =
+  scoreSubHtml(D.scoreboard.caixa_prevista_total, D.scoreboard.caixa_realizado_total, fmtMoney);
 
 // ===== Datas do mês (usado pelo pace e pelos gráficos) =====
 const MONTH_DATES = (function() {

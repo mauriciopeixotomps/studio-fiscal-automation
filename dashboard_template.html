@@ -134,6 +134,14 @@
   .rk-row .rk-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rk-row .rk-nums { color: var(--text-dim); margin-top: 2px; }
 
+  /* ===== Mapa de calor ===== */
+  .heatmap-wrap { overflow-x: auto; }
+  .heatmap-grid { display: grid; gap: 4px; min-width: 640px; }
+  .heatmap-cell { aspect-ratio: 1.4; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--text); }
+  .heatmap-cell.empty { color: var(--text-dim); font-weight: 400; }
+  .heatmap-hour { font-size: 11px; color: var(--text-dim); text-align: center; padding-bottom: 4px; }
+  .heatmap-day { font-size: 12px; color: var(--text-dim); display: flex; align-items: center; padding-right: 6px; }
+
   /* ===== KPI grid ===== */
   .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; }
   .kpi { background: var(--card-hi); border-radius: 10px; padding: 14px; text-align: center; }
@@ -302,6 +310,11 @@
         <div class="ranking-cols" id="ranking-criativos"></div>
       </div>
     </div>
+  </div>
+
+  <div class="card">
+    <h2>Mapa de calor — horários de CC1 <span class="hint">— seg-sex, 09h-20h, pelo horário agendado (não quando foi marcada como feita)</span></h2>
+    <div id="heatmap-cc1"></div>
   </div>
 
   <div class="card">
@@ -634,6 +647,33 @@ document.getElementById('ranking-campanhas').innerHTML =
   rkList(D.ranking.campanhas.melhores, 'best', 'Melhores') + rkList(D.ranking.campanhas.piores, 'worst', 'Piores');
 document.getElementById('ranking-criativos').innerHTML =
   rkList(D.ranking.criativos.melhores, 'best', 'Melhores') + rkList(D.ranking.criativos.piores, 'worst', 'Piores');
+
+// ===== Mapa de calor — horários de CC1 =====
+(function renderHeatmapCC1() {
+  const { dias, horas, matriz } = D.heatmap_cc1;
+  const max = Math.max(1, ...matriz.flat());
+  const cols = horas.length;
+  const cellsHtml = [];
+  cellsHtml.push(`<div></div>`);
+  horas.forEach(h => cellsHtml.push(`<div class="heatmap-hour">${String(h).padStart(2, '0')}h</div>`));
+  dias.forEach((dia, i) => {
+    cellsHtml.push(`<div class="heatmap-day">${dia}</div>`);
+    matriz[i].forEach((v, hIdx) => {
+      const alpha = v === 0 ? 0 : 0.15 + 0.75 * (v / max);
+      const style = v === 0
+        ? `background: var(--card-hi);`
+        : `background: rgba(213,174,119,${alpha.toFixed(2)});`;
+      const horaLbl = String(horas[hIdx]).padStart(2, '0') + 'h';
+      cellsHtml.push(`<div class="heatmap-cell${v === 0 ? ' empty' : ''}" style="${style}" title="${dia} ${horaLbl}">${v || ''}</div>`);
+    });
+  });
+  document.getElementById('heatmap-cc1').innerHTML = `
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" style="grid-template-columns: 90px repeat(${cols}, 1fr);">
+        ${cellsHtml.join('')}
+      </div>
+    </div>`;
+})();
 
 // ===== Relatório por closer (diário / semanal / mês) =====
 const RELATORIO_METRICS = [

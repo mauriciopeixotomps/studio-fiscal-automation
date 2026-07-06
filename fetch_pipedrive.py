@@ -115,6 +115,7 @@ def act_row(a):
         'assunto': a.get('subject'),
         'negocio_id': a.get('deal_id'),
         'due_date': a.get('due_date'),
+        'due_time': a.get('due_time'),
         'marked_as_done_time': a.get('marked_as_done_time'),
         'done': a.get('done'),
     }

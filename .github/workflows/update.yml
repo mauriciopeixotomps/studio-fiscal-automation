@@ -1,13 +1,9 @@
 name: Atualiza dashboard Studio Fiscal
 
 on:
-  schedule:
-    # 08:00–19:30 BRT (UTC-3) seg-sex, a cada 30 min
-    - cron: '*/30 11-22 * * 1-5'
-    # 20:00 BRT seg-sex (última rodada do dia)
-    - cron: '0 23 * * 1-5'
-    # 18:00 BRT sábado
-    - cron: '0 21 * * 6'
+  # Disparado por um cron externo (cron-job.org), não pelo `schedule:` do GitHub
+  # Actions — o agendamento nativo dele é "melhor esforço" e vinha atrasando
+  # várias horas, especialmente com gatilhos frequentes (a cada 30 min).
   workflow_dispatch: {}
 
 jobs:

@@ -76,9 +76,13 @@ CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 
 # ============= NEGÓCIOS EXCLUÍDOS =============
 # deal_id que aparece com um dos 4 closers como "owner" no Pipedrive, mas que o time
-# confirmou não ser deles de fato (ex: negócio do Émerson, de outra equipe, mal
-# atribuído no Pipedrive). Excluído de leads/contratos por closer e do consolidado.
-DEALS_EXCLUIDOS = {57206}
+# confirmou não ser fechamento real. Excluído de leads/contratos por closer e do
+# consolidado.
+# - 57206: negócio do Émerson, de outra equipe, mal atribuído no Pipedrive.
+# - 84764, 92183: marcados "Ganho" (valor R$0) ainda em estágio inicial da
+#   Qualificadora (LEAD/PRÉ-QUALIFICAÇÃO), no mesmo minuto — parece marcação em
+#   massa/erro de dados, não fechamento real, confirmado com o time (03/07/2026).
+DEALS_EXCLUIDOS = {57206, 84764, 92183}
 
 # ============= CONVERSÃO DE REFERÊNCIA (quadro do time, "conta pra cada contrato") =============
 # 100 leads -> 15 CC1 realizada -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 contrato fechado.

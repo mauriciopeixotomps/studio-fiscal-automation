@@ -5,6 +5,7 @@ por closer + consolidado do time, e gera publish/index.html a partir do template
 import base64, json, os
 from collections import Counter
 from datetime import date, timedelta
+from zoneinfo import ZoneInfo
 import pandas as pd
 
 import config
@@ -350,7 +351,7 @@ dashboard = {
     'mes_label': config.MONTH_LABEL,
     'periodo_inicio': config.MONTH_START.isoformat(),
     'periodo_fim': config.MONTH_END.isoformat(),
-    'gerado_em': pd.Timestamp.now().isoformat(timespec='minutes'),
+    'gerado_em': pd.Timestamp.now(tz=ZoneInfo('America/Sao_Paulo')).strftime('%Y-%m-%dT%H:%M'),
     'meta_contratos': metas['meta_contratos'],
     'meta_leads': meta_leads,
     'closers': closers_out,

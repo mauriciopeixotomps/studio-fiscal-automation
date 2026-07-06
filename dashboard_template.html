@@ -848,15 +848,19 @@ document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(btn => {
 });
 
 // ===== Previsão =====
-function confiancaBadge(v) {
-  if (!v) return '—';
+function confiancaCategoria(v) {
+  if (!v) return null;
   const norm = v.toString().trim().toLowerCase()
     .normalize('NFD').replace(/[̀-ͯ]/g, ''); // remove acentos
-  const cls = norm.includes('duvid') ? 'em-duvida'
+  return norm.includes('duvid') ? 'em-duvida'
     : (norm.includes('confia') || norm.includes('fechad')) ? 'confiante'
     : norm.includes('quente') ? 'quente'
     : norm.includes('morno') ? 'morno'
     : null;
+}
+function confiancaBadge(v) {
+  if (!v) return '—';
+  const cls = confiancaCategoria(v);
   return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
 }
 const tbody = document.querySelector('#previsao-table tbody');
@@ -878,25 +882,34 @@ tbody.innerHTML = D.previsao.map(r => `
   </tr>
 `).join('');
 
-const previsaoTotais = D.previsao.reduce((acc, r) => {
-  acc.venda += r.venda || 0;
-  acc.caixa += r.caixa || 0;
-  acc.venda_realizada += r.venda_realizada || 0;
-  acc.caixa_realizado += r.caixa_realizado || 0;
-  return acc;
-}, { venda: 0, caixa: 0, venda_realizada: 0, caixa_realizado: 0 });
-document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? `
-  <tr class="relatorio-total">
-    <td colspan="6">Total (${D.previsao.length} negócio${D.previsao.length === 1 ? '' : 's'})</td>
-    <td>${fmtMoney(previsaoTotais.venda)}</td>
-    <td>${fmtMoney(previsaoTotais.caixa)}</td>
-    <td></td>
-    <td></td>
-    <td>${fmtMoney(previsaoTotais.venda_realizada)}</td>
-    <td>${fmtMoney(previsaoTotais.caixa_realizado)}</td>
-    <td></td>
-  </tr>
-` : '';
+function previsaoSomar(rows) {
+  return rows.reduce((acc, r) => {
+    acc.venda += r.venda || 0;
+    acc.caixa += r.caixa || 0;
+    acc.venda_realizada += r.venda_realizada || 0;
+    acc.caixa_realizado += r.caixa_realizado || 0;
+    return acc;
+  }, { venda: 0, caixa: 0, venda_realizada: 0, caixa_realizado: 0 });
+}
+function previsaoTotalRowHtml(label, rows) {
+  const t = previsaoSomar(rows);
+  return `
+    <tr class="relatorio-total">
+      <td colspan="6">${label} (${rows.length} negócio${rows.length === 1 ? '' : 's'})</td>
+      <td>${fmtMoney(t.venda)}</td>
+      <td>${fmtMoney(t.caixa)}</td>
+      <td></td>
+      <td></td>
+      <td>${fmtMoney(t.venda_realizada)}</td>
+      <td>${fmtMoney(t.caixa_realizado)}</td>
+      <td></td>
+    </tr>`;
+}
+const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente');
+document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
+  previsaoTotalRowHtml('Total geral', D.previsao) +
+  previsaoTotalRowHtml('Total só Quentes', previsaoQuentes)
+) : '';
 </script>
 </body>
 </html>

@@ -141,7 +141,7 @@ for _, r in df.iterrows():
 
 df_out = pd.DataFrame(rows)
 df_out.to_excel(os.path.join(OUT_DIR, 'previsao.xlsx'), index=False)
-n_realizados = df_out['venda_realizada'].notna().sum()
+n_realizados = df_out['venda_realizada'].notna().sum() if not df_out.empty else 0
 print(f'   {n_realizados} negócios já Ganhos (venda/caixa realizado preenchido)')
 print(f'Salvo em {OUT_DIR}/previsao.xlsx')
 

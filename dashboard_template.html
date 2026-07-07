@@ -165,10 +165,11 @@
   .relatorio-tabs { display: flex; gap: 6px; }
   .relatorio-toolbar { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin: -10px 0 16px; }
   .relatorio-sort { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-dim); }
-  .relatorio-sort select {
+  .relatorio-sort select, .relatorio-sort input[type="date"] {
     background: var(--card-hi); border: 1px solid var(--border); color: var(--text);
     font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 999px; cursor: pointer;
   }
+  .relatorio-sort input[type="date"]::-webkit-calendar-picker-indicator { filter: invert(1); opacity: .7; cursor: pointer; }
   .relatorio-tabs .rtab, .relatorio-sort .rtab {
     background: var(--card-hi); border: 1px solid var(--border); color: var(--text-dim);
     font-size: 12px; font-weight: 600; padding: 6px 12px; border-radius: 999px; cursor: pointer;
@@ -319,6 +320,11 @@
         <button class="rtab active" data-period="diario">Diário</button>
         <button class="rtab" data-period="semanal">Semanal</button>
         <button class="rtab" data-period="mes">Mês</button>
+      </div>
+      <div class="relatorio-sort">
+        <label for="relatorio-data">Ver o dia</label>
+        <input type="date" id="relatorio-data">
+        <button id="relatorio-data-limpar" class="rtab" title="Voltar pra lista de dias">Limpar</button>
       </div>
       <div class="relatorio-sort">
         <label for="relatorio-sort-key">Ordenar por</label>
@@ -704,8 +710,8 @@ function relatorioFmtWeek(mondayIso) {
   const fmt = d => d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   return `${fmt(start)} – ${fmt(end)}`;
 }
-function relatorioDailyRows(diario) {
-  const days = MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+function relatorioDailyRows(diario, filterDate) {
+  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
   return days.map(iso => {
     const row = { label: relatorioFmtDay(iso) };
     RELATORIO_METRICS.forEach(([key, , snapshot]) => { row[key] = snapshot ? null : (diario[key] || {})[iso] || 0; });
@@ -736,8 +742,8 @@ function relatorioTotalRow(rows) {
   });
   return row;
 }
-function relatorioTeamDailyRows() {
-  const days = MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+function relatorioTeamDailyRows(filterDate) {
+  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
   return days.map(iso => {
     const row = { label: relatorioFmtDay(iso) };
     RELATORIO_METRICS.forEach(([key, , snapshot]) => {
@@ -791,19 +797,20 @@ function relatorioBuildCards(order) {
 }
 
 function relatorioRenderPeriod(period, order) {
+  const filterDate = period === 'diario' ? (document.getElementById('relatorio-data').value || null) : null;
   order.forEach((c, i) => {
     const diario = c.diario || {};
     let rows, totalRow;
     if (period === 'semanal') { rows = relatorioWeeklyRows(diario); totalRow = relatorioTotalRow(rows); }
     else if (period === 'mes') { rows = relatorioMonthRow(c); totalRow = null; }
-    else { rows = relatorioDailyRows(diario); totalRow = relatorioTotalRow(rows); }
+    else { rows = relatorioDailyRows(diario, filterDate); totalRow = filterDate ? null : relatorioTotalRow(rows); }
     relatorioRenderTable(`relatorio-table-${i}`, rows, totalRow);
   });
 
   let teamRows, teamTotal;
   if (period === 'semanal') { teamRows = relatorioTeamWeeklyRows(); teamTotal = relatorioTotalRow(teamRows); }
   else if (period === 'mes') { teamRows = relatorioTeamMonthRow(); teamTotal = null; }
-  else { teamRows = relatorioTeamDailyRows(); teamTotal = relatorioTotalRow(teamRows); }
+  else { teamRows = relatorioTeamDailyRows(filterDate); teamTotal = filterDate ? null : relatorioTotalRow(teamRows); }
   relatorioRenderTable('relatorio-table-team', teamRows, teamTotal);
 }
 
@@ -834,6 +841,21 @@ document.getElementById('relatorio-sort-dir').addEventListener('click', function
   this.dataset.dir = dir;
   this.textContent = dir === 'asc' ? '↑ menor → maior' : '↓ maior → menor';
   relatorioRefresh();
+});
+
+const relatorioDataInput = document.getElementById('relatorio-data');
+relatorioDataInput.min = D.periodo_inicio;
+relatorioDataInput.max = TODAY_ISO < D.periodo_fim ? TODAY_ISO : D.periodo_fim;
+relatorioDataInput.addEventListener('change', () => {
+  if (!relatorioDataInput.value) return;
+  relatorioPeriod = 'diario';
+  document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(b => b.classList.remove('active'));
+  document.querySelector('#relatorio-tabs-global .rtab[data-period="diario"]').classList.add('active');
+  relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+});
+document.getElementById('relatorio-data-limpar').addEventListener('click', () => {
+  relatorioDataInput.value = '';
+  relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
 });
 
 relatorioRefresh();

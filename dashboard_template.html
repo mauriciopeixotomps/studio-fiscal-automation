@@ -711,7 +711,7 @@ function relatorioFmtWeek(mondayIso) {
   return `${fmt(start)} – ${fmt(end)}`;
 }
 function relatorioDailyRows(diario, filterDate) {
-  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO);
   return days.map(iso => {
     const row = { label: relatorioFmtDay(iso) };
     RELATORIO_METRICS.forEach(([key, , snapshot]) => { row[key] = snapshot ? null : (diario[key] || {})[iso] || 0; });
@@ -728,7 +728,7 @@ function relatorioWeeklyRows(diario) {
       weeks[wk][key] = snapshot ? null : (weeks[wk][key] || 0) + ((diario[key] || {})[iso] || 0);
     });
   });
-  return Object.keys(weeks).sort().reverse().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
+  return Object.keys(weeks).sort().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
 }
 function relatorioMonthRow(closer) {
   const row = { label: 'Mês inteiro' };
@@ -743,7 +743,7 @@ function relatorioTotalRow(rows) {
   return row;
 }
 function relatorioTeamDailyRows(filterDate) {
-  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO).slice().reverse();
+  const days = filterDate ? [filterDate] : MONTH_DATES.filter(d => d <= TODAY_ISO);
   return days.map(iso => {
     const row = { label: relatorioFmtDay(iso) };
     RELATORIO_METRICS.forEach(([key, , snapshot]) => {
@@ -764,7 +764,7 @@ function relatorioTeamWeeklyRows() {
       weeks[wk][key] = (weeks[wk][key] || 0) + dayTotal;
     });
   });
-  return Object.keys(weeks).sort().reverse().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
+  return Object.keys(weeks).sort().map(wk => ({ label: relatorioFmtWeek(wk), ...weeks[wk] }));
 }
 function relatorioTeamMonthRow() {
   const row = { label: 'Mês inteiro' };

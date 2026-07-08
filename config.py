@@ -54,7 +54,6 @@ ACT_CC1 = 'meeting'             # id 2  — CC1 Realizada (done=true) / CC1 Para
 ACT_FPQ = 'fpq_recebida'        # id 13 — FPQ Recebida
 ACT_CC2 = 'cc2_realizada1'      # id 10 — CC2 Realizada (done=true) / CC2 Para Acontecer (done=false)
 ACT_CC3 = 'cc3_realizada'       # id 32 — CC3 Realizada
-ACT_CONTRATO_ENVIADO = 'contrato_enviado'  # id 11 — Contrato enviado
 
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 
@@ -66,6 +65,12 @@ PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 # ENVIADO. Repasse não é definido pela etapa (o closer às vezes faz a CC1 e já marca
 # como perdido ainda em MQL FRANQUIA) — quem perdeu o negócio (owner_id) é que decide
 # se foi a Qualificadora (SDR) ou a Expansão (um dos 4 closers). Ver build_dashboard.py.
+
+# "Contrato enviado" é contado pela etapa do negócio (chegou em CONTRATO ENVIADO),
+# não por uma atividade separada — o time não estava registrando essa atividade de
+# forma confiável, então a etapa do funil é a fonte de verdade (usa stage_change_time
+# pra saber quando entrou; só pega negócios que estão *atualmente* nessa etapa).
+PIPELINE_STAGE_CONTRATO_ENVIADO = 603
 
 # Campo customizado de negócio: Valor de Caixa (Entrada + Taxa)
 CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'

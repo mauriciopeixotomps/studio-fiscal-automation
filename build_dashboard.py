@@ -30,7 +30,6 @@ cc2_fut = load('activities_cc2_futura.xlsx')
 cc3_re = load('activities_cc3_realizada.xlsx')
 cc3_fut = load('activities_cc3_futura.xlsx')
 fpq_re = load('activities_fpq_realizada.xlsx')
-contrato_enviado_re = load('activities_contrato_enviado_realizada.xlsx')
 deals = load('deals.xlsx')
 deals_p62 = load('deals_pipeline62.xlsx')
 previsao = load('previsao.xlsx')
@@ -39,6 +38,16 @@ if not deals.empty:
     deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not deals_p62.empty:
     deals_p62 = deals_p62[~deals_p62['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+
+# "Contrato enviado" contado pela etapa do negócio (config.PIPELINE_STAGE_CONTRATO_ENVIADO),
+# não por uma atividade separada — só pega negócios que estão *atualmente* nessa etapa,
+# usando stage_change_time como data de referência (ver comentário em config.py).
+_closer_nome_por_id = {c['id']: c['nome'] for c in config.CLOSERS}
+contrato_enviado_re = pd.DataFrame()
+if not deals_p62.empty and 'stage_id' in deals_p62.columns:
+    contrato_enviado_re = deals_p62[deals_p62['stage_id'] == config.PIPELINE_STAGE_CONTRATO_ENVIADO].copy()
+    contrato_enviado_re['closer_nome'] = contrato_enviado_re['owner_id'].map(_closer_nome_por_id)
+    contrato_enviado_re = contrato_enviado_re[contrato_enviado_re['closer_nome'].notna()]
 
 if not os.path.exists(os.path.join(WORKDIR, config.METAS_FILE)):
     raise RuntimeError(
@@ -124,7 +133,7 @@ for c in config.CLOSERS:
         'fpq_realizada': per_closer_daily(fpq_re, 'marked_as_done_time', c['nome']),
         'cc2_realizada': per_closer_daily(cc2_re, 'marked_as_done_time', c['nome']),
         'cc3_realizada': per_closer_daily(cc3_re, 'marked_as_done_time', c['nome']),
-        'contrato_enviado': per_closer_daily(contrato_enviado_re, 'marked_as_done_time', c['nome']),
+        'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
         'contratos': per_closer_daily(deals, 'won_time', c['nome'], status='won'),
     }
     closers_out.append({'nome': c['nome'], 'foto': c['foto'], **metrics, 'diario': diario})
@@ -173,7 +182,7 @@ consolidado['leads_funil'] = sum(daily_leads.values())
 consolidado['leads_atribuidos_closers'] = consolidado['leads']
 consolidado['leads'] = consolidado['leads_funil']
 
-daily_contrato_enviado = daily_series(contrato_enviado_re, 'marked_as_done_time')
+daily_contrato_enviado = daily_series(contrato_enviado_re, 'stage_change_time')
 
 daily_contratos = {}
 if not deals.empty:

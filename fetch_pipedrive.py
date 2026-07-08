@@ -89,12 +89,14 @@ CLOSER_NAME = {c['id']: c['nome'] for c in config.CLOSERS}
 
 # ============= ACTIVITIES =============
 # (activity_type, tem_para_acontecer)
+# "Contrato enviado" não entra aqui — é contado pela etapa do negócio (ver config.py
+# PIPELINE_STAGE_CONTRATO_ENVIADO), o time não registrava a atividade separada de forma
+# confiável.
 ACT_STAGES = [
     ('cc1', config.ACT_CC1, True),
     ('cc2', config.ACT_CC2, True),
     ('cc3', config.ACT_CC3, True),
     ('fpq', config.ACT_FPQ, False),
-    ('contrato_enviado', config.ACT_CONTRATO_ENVIADO, False),
 ]
 
 
@@ -281,6 +283,7 @@ for d in p62_raw + p62_lost:
         'deal_id': d.get('id'),
         'titulo': d.get('title'),
         'stage_id': d.get('stage_id'),
+        'stage_change_time': d.get('stage_change_time'),
         'status': d.get('status'),
         'add_time': d.get('add_time'),
         'lost_time': d.get('lost_time'),

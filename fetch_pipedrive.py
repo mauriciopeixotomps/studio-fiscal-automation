@@ -13,6 +13,7 @@ Gera em /data_pipedrive/:
 - deals.xlsx  — negócios com um dos 4 closers como proprietário (p/ leads e contratos)
 """
 import urllib.request, urllib.parse, urllib.error, json, os, time
+from datetime import timedelta
 import pandas as pd
 import concurrent.futures
 
@@ -85,6 +86,43 @@ def _in_range(dt_str, start, end):
         return False
 
 
+# A conta Pipedrive do Grupo Studio devolve TODO campo de data/hora 3h à frente do
+# horário real de Brasília (confirmado comparando due_time/marked_as_done_time de
+# atividades reais contra o relatório oficial de Insights do Pipedrive p/ as mesmas
+# atividades — provavelmente timezone da conta mal configurado). Corrige subtraindo
+# 3h de tudo, direto na busca, pra todo o resto do pipeline já trabalhar com o
+# horário certo.
+TZ_OFFSET = timedelta(hours=3)
+
+
+def _fix_dt(dt_str):
+    """Corrige um datetime completo ('2026-07-07 19:47:54') -3h."""
+    if not dt_str:
+        return dt_str
+    try:
+        return (pd.to_datetime(dt_str) - TZ_OFFSET).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return dt_str
+
+
+def _fix_due(due_date, due_time):
+    """Corrige o par due_date+due_time (-3h), com possível virada de dia."""
+    if not due_date:
+        return due_date, due_time
+    try:
+        combined = pd.to_datetime(f"{due_date} {due_time or '00:00:00'}") - TZ_OFFSET
+        return combined.strftime('%Y-%m-%d'), (combined.strftime('%H:%M') if due_time else due_time)
+    except Exception:
+        return due_date, due_time
+
+
+def _correct_activity_tz(a):
+    a = dict(a)
+    a['due_date'], a['due_time'] = _fix_due(a.get('due_date'), a.get('due_time'))
+    a['marked_as_done_time'] = _fix_dt(a.get('marked_as_done_time'))
+    return a
+
+
 CLOSER_NAME = {c['id']: c['nome'] for c in config.CLOSERS}
 
 # ============= ACTIVITIES =============
@@ -135,7 +173,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
 
 cc1_realizada_rows = []
 for stage_key, act_type, tem_futura in ACT_STAGES:
-    raw = acts_by_stage[stage_key]
+    raw = [_correct_activity_tz(a) for a in acts_by_stage[stage_key]]
     realizada = [act_row(a) for a in raw
                  if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END)]
     if stage_key == 'cc1':
@@ -210,8 +248,8 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'status': d.get('status'),
                 'valor': d.get('value'),
                 'caixa': d.get(config.CF_CAIXA),
-                'add_time': d.get('add_time'),
-                'won_time': d.get('won_time'),
+                'add_time': _fix_dt(d.get('add_time')),
+                'won_time': _fix_dt(d.get('won_time')),
             })
 
 df_deals = pd.DataFrame(deals_rows)
@@ -263,7 +301,7 @@ while not stop:
     if not data:
         break
     for d in data:
-        lt = d.get('lost_time')
+        lt = _fix_dt(d.get('lost_time'))
         if lt and _in_range(lt, config.MONTH_START, config.MONTH_END):
             lost_rows_all.append(d)
         elif lt and pd.to_datetime(lt).date() < config.MONTH_START:
@@ -283,10 +321,10 @@ for d in p62_raw + p62_lost:
         'deal_id': d.get('id'),
         'titulo': d.get('title'),
         'stage_id': d.get('stage_id'),
-        'stage_change_time': d.get('stage_change_time'),
+        'stage_change_time': _fix_dt(d.get('stage_change_time')),
         'status': d.get('status'),
-        'add_time': d.get('add_time'),
-        'lost_time': d.get('lost_time'),
+        'add_time': _fix_dt(d.get('add_time')),
+        'lost_time': _fix_dt(d.get('lost_time')),
         'lost_reason': d.get('lost_reason'),
         'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
         'owner_nome': owner.get('name') if isinstance(owner, dict) else None,

@@ -317,9 +317,9 @@
     <h2>Relatório por closer <span class="hint">— diário, semanal e consolidado do mês</span></h2>
     <div class="relatorio-toolbar">
       <div class="relatorio-tabs" id="relatorio-tabs-global">
-        <button class="rtab active" data-period="diario">Diário</button>
+        <button class="rtab" data-period="diario">Diário</button>
         <button class="rtab" data-period="semanal">Semanal</button>
-        <button class="rtab" data-period="mes">Mês</button>
+        <button class="rtab active" data-period="mes">Mês</button>
       </div>
       <div class="relatorio-sort">
         <label for="relatorio-data">Ver o dia</label>
@@ -329,7 +329,7 @@
       <div class="relatorio-sort">
         <label for="relatorio-sort-key">Ordenar por</label>
         <select id="relatorio-sort-key"></select>
-        <button id="relatorio-sort-dir" class="rtab" data-dir="asc" title="Ordem">↑ menor → maior</button>
+        <button id="relatorio-sort-dir" class="rtab" data-dir="desc" title="Ordem">↓ maior → menor</button>
       </div>
     </div>
     <div id="relatorio-closers"></div>
@@ -827,7 +827,7 @@ function relatorioRenderPeriod(period, order) {
   relatorioRenderTable('relatorio-table-team', teamRows, teamTotal);
 }
 
-let relatorioPeriod = 'diario';
+let relatorioPeriod = 'mes';
 let relatorioOrder = D.closers.slice();
 
 function relatorioSortedOrder() {
@@ -846,7 +846,7 @@ function relatorioRefresh() {
 
 document.getElementById('relatorio-sort-key').innerHTML =
   RELATORIO_METRICS.map(([key, label]) => `<option value="${key}">${label}</option>`).join('');
-document.getElementById('relatorio-sort-key').value = 'leads';
+document.getElementById('relatorio-sort-key').value = 'cc1_realizada';
 document.getElementById('relatorio-sort-key').addEventListener('change', relatorioRefresh);
 
 document.getElementById('relatorio-sort-dir').addEventListener('click', function () {

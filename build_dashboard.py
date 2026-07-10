@@ -335,23 +335,30 @@ ranking = {
     'criativos': ranking_utm('utm_criativo'),
 }
 
-# ============= MAPA DE CALOR — HORÁRIOS DE CC1 REALIZADA (seg-sex, 09h-20h) =============
+# ============= MAPA DE CALOR — HORÁRIOS DE CC1/FPQ REALIZADA (seg-sex, 09h-20h) =============
 # Usa marked_as_done_time (dia da semana + hora em que foi marcada como realizada),
 # não due_date/due_time (horário originalmente agendado).
 HEATMAP_DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']
 HEATMAP_HORAS = list(range(9, 21))  # 09h a 20h
-heatmap_matriz = [[0] * len(HEATMAP_HORAS) for _ in HEATMAP_DIAS]
-if not cc1_re.empty and 'marked_as_done_time' in cc1_re.columns:
-    hm = cc1_re.copy()
-    hm['marked_as_done_time'] = pd.to_datetime(hm['marked_as_done_time'], errors='coerce')
-    for _, r in hm.dropna(subset=['marked_as_done_time']).iterrows():
-        wd = r['marked_as_done_time'].weekday()  # 0=segunda ... 6=domingo
-        if wd > 4:
-            continue
-        hora = r['marked_as_done_time'].hour
-        if hora in HEATMAP_HORAS:
-            heatmap_matriz[wd][HEATMAP_HORAS.index(hora)] += 1
-heatmap_cc1 = {'dias': HEATMAP_DIAS, 'horas': HEATMAP_HORAS, 'matriz': heatmap_matriz}
+
+
+def build_heatmap(df):
+    matriz = [[0] * len(HEATMAP_HORAS) for _ in HEATMAP_DIAS]
+    if not df.empty and 'marked_as_done_time' in df.columns:
+        hm = df.copy()
+        hm['marked_as_done_time'] = pd.to_datetime(hm['marked_as_done_time'], errors='coerce')
+        for _, r in hm.dropna(subset=['marked_as_done_time']).iterrows():
+            wd = r['marked_as_done_time'].weekday()  # 0=segunda ... 6=domingo
+            if wd > 4:
+                continue
+            hora = r['marked_as_done_time'].hour
+            if hora in HEATMAP_HORAS:
+                matriz[wd][HEATMAP_HORAS.index(hora)] += 1
+    return {'dias': HEATMAP_DIAS, 'horas': HEATMAP_HORAS, 'matriz': matriz}
+
+
+heatmap_cc1 = build_heatmap(cc1_re)
+heatmap_fpq = build_heatmap(fpq_re)
 
 # ============= FPQS RECEBIDAS (lista, com link pro Pipedrive) =============
 fpqs_recebidas = []
@@ -403,6 +410,7 @@ dashboard = {
     'perdidos': perdidos,
     'ranking': ranking,
     'heatmap_cc1': heatmap_cc1,
+    'heatmap_fpq': heatmap_fpq,
     'scoreboard': scoreboard,
     'previsao': previsao_out,
     'fpqs_recebidas': fpqs_recebidas,

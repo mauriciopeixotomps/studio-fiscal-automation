@@ -135,6 +135,9 @@
   .rk-row .rk-nums { color: var(--text-dim); margin-top: 2px; }
 
   /* ===== Mapa de calor ===== */
+  .heatmap-row { display: flex; gap: 32px; flex-wrap: wrap; }
+  .heatmap-col { flex: 1 1 420px; min-width: 320px; }
+  .heatmap-subtitle { font-size: 13px; color: var(--text-dim); font-weight: 600; margin-bottom: 10px; }
   .heatmap-wrap { overflow-x: auto; }
   .heatmap-grid { display: grid; gap: 3px; max-width: 640px; }
   .heatmap-cell { height: 28px; border-radius: 5px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--text); }
@@ -371,8 +374,17 @@
   </div>
 
   <div class="card">
-    <h2>Mapa de calor — horários de CC1 <span class="hint">— seg-sex, 09h-20h, pelo horário em que foi marcada como realizada</span></h2>
-    <div id="heatmap-cc1"></div>
+    <h2>Mapa de calor — horários <span class="hint">— seg-sex, 09h-20h, pelo horário em que foi marcada como realizada</span></h2>
+    <div class="heatmap-row">
+      <div class="heatmap-col">
+        <div class="heatmap-subtitle">CC1 realizada</div>
+        <div id="heatmap-cc1"></div>
+      </div>
+      <div class="heatmap-col">
+        <div class="heatmap-subtitle">FPQ recebida</div>
+        <div id="heatmap-fpq"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -666,9 +678,9 @@ document.getElementById('ranking-campanhas').innerHTML =
 document.getElementById('ranking-criativos').innerHTML =
   rkList(D.ranking.criativos.melhores, 'best', 'Melhores') + rkList(D.ranking.criativos.piores, 'worst', 'Piores');
 
-// ===== Mapa de calor — horários de CC1 (dias no topo, horas na lateral, estilo agenda) =====
-(function renderHeatmapCC1() {
-  const { dias, horas, matriz } = D.heatmap_cc1;
+// ===== Mapa de calor — horários (dias no topo, horas na lateral, estilo agenda) =====
+function renderHeatmap(targetId, heatmapData) {
+  const { dias, horas, matriz } = heatmapData;
   const max = Math.max(1, ...matriz.flat());
   const cols = dias.length;
   const cellsHtml = [];
@@ -686,13 +698,15 @@ document.getElementById('ranking-criativos').innerHTML =
       cellsHtml.push(`<div class="heatmap-cell${v === 0 ? ' empty' : ''}" style="${style}" title="${dia} ${horaLbl}">${v || ''}</div>`);
     });
   });
-  document.getElementById('heatmap-cc1').innerHTML = `
+  document.getElementById(targetId).innerHTML = `
     <div class="heatmap-wrap">
       <div class="heatmap-grid" style="grid-template-columns: 60px repeat(${cols}, 1fr);">
         ${cellsHtml.join('')}
       </div>
     </div>`;
-})();
+}
+renderHeatmap('heatmap-cc1', D.heatmap_cc1);
+renderHeatmap('heatmap-fpq', D.heatmap_fpq);
 
 // ===== Relatório por closer (diário / semanal / mês) =====
 const RELATORIO_METRICS = [

@@ -367,6 +367,10 @@
     </div>
     <div class="card">
       <h2>FPQs recebidas <span class="hint">— clique em "ver" pra abrir o negócio no Pipedrive e ler a FPQ completa</span></h2>
+      <div class="relatorio-sort" style="margin-bottom:12px">
+        <label for="fpq-closer-filter">Closer</label>
+        <select id="fpq-closer-filter"></select>
+      </div>
       <div style="overflow-x:auto">
         <table id="fpq-table">
           <thead>
@@ -902,16 +906,24 @@ function confiancaBadge(v) {
   return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
 }
 const fpqTbody = document.querySelector('#fpq-table tbody');
-fpqTbody.innerHTML = D.fpqs_recebidas.length ? D.fpqs_recebidas.map(r => {
-  const [dataPart, horaPart] = r.data.split(' ');
-  return `
-  <tr>
-    <td>${fmtDate(dataPart)}${horaPart ? ' ' + horaPart : ''}</td>
-    <td>${r.closer_nome || '—'}</td>
-    <td>${r.pessoa_nome || r.negocio_titulo || '—'}</td>
-    <td>${r.deal_link ? `<a class="link" href="${r.deal_link}" target="_blank">ver</a>` : '—'}</td>
-  </tr>`;
-}).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Nenhuma FPQ recebida no mês</td></tr>';
+function fpqRenderTable(closerFiltro) {
+  const rows = closerFiltro ? D.fpqs_recebidas.filter(r => r.closer_nome === closerFiltro) : D.fpqs_recebidas;
+  fpqTbody.innerHTML = rows.length ? rows.map(r => {
+    const [dataPart, horaPart] = r.data.split(' ');
+    return `
+    <tr>
+      <td>${fmtDate(dataPart)}${horaPart ? ' ' + horaPart : ''}</td>
+      <td>${r.closer_nome || '—'}</td>
+      <td>${r.pessoa_nome || r.negocio_titulo || '—'}</td>
+      <td>${r.deal_link ? `<a class="link" href="${r.deal_link}" target="_blank">ver</a>` : '—'}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Nenhuma FPQ recebida no mês</td></tr>';
+}
+const fpqCloserFilter = document.getElementById('fpq-closer-filter');
+fpqCloserFilter.innerHTML = '<option value="">Todos</option>' +
+  D.closers.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
+fpqCloserFilter.addEventListener('change', () => fpqRenderTable(fpqCloserFilter.value));
+fpqRenderTable('');
 
 const tbody = document.querySelector('#previsao-table tbody');
 tbody.innerHTML = D.previsao.map(r => `

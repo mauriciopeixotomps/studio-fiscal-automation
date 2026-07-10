@@ -174,8 +174,21 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
 cc1_realizada_rows = []
 for stage_key, act_type, tem_futura in ACT_STAGES:
     raw = [_correct_activity_tz(a) for a in acts_by_stage[stage_key]]
-    realizada = [act_row(a) for a in raw
-                 if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END)]
+    done_no_mes = [a for a in raw
+                   if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END)]
+    if stage_key == 'fpq':
+        # FPQ recebida: guarda pessoa/negócio + link direto pro Pipedrive, pra dar
+        # pra abrir e ver a FPQ (fica registrada como nota da atividade lá).
+        realizada = []
+        for a in done_no_mes:
+            row = act_row(a)
+            row['pessoa_nome'] = a.get('person_name')
+            row['negocio_titulo'] = a.get('deal_title')
+            deal_id = a.get('deal_id')
+            row['deal_link'] = f'https://{config.PIPEDRIVE_DOMAIN}/deal/{deal_id}' if deal_id else None
+            realizada.append(row)
+    else:
+        realizada = [act_row(a) for a in done_no_mes]
     if stage_key == 'cc1':
         cc1_realizada_rows = realizada
     else:

@@ -342,6 +342,18 @@
   </div>
 
   <div class="card">
+    <h2>FPQs recebidas <span class="hint">— clique em "ver" pra abrir o negócio no Pipedrive e ler a FPQ completa</span></h2>
+    <div style="overflow-x:auto">
+      <table id="fpq-table">
+        <thead>
+          <tr><th>Data</th><th>Closer</th><th>Lead</th><th>FPQ</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Previsão <span class="hint">— preenchida manualmente pelo time (planilha)</span></h2>
     <div style="overflow-x:auto">
       <table id="previsao-table">
@@ -886,6 +898,18 @@ function confiancaBadge(v) {
   const cls = confiancaCategoria(v);
   return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
 }
+const fpqTbody = document.querySelector('#fpq-table tbody');
+fpqTbody.innerHTML = D.fpqs_recebidas.length ? D.fpqs_recebidas.map(r => {
+  const [dataPart, horaPart] = r.data.split(' ');
+  return `
+  <tr>
+    <td>${fmtDate(dataPart)}${horaPart ? ' ' + horaPart : ''}</td>
+    <td>${r.closer_nome || '—'}</td>
+    <td>${r.pessoa_nome || r.negocio_titulo || '—'}</td>
+    <td>${r.deal_link ? `<a class="link" href="${r.deal_link}" target="_blank">ver</a>` : '—'}</td>
+  </tr>`;
+}).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Nenhuma FPQ recebida no mês</td></tr>';
+
 const tbody = document.querySelector('#previsao-table tbody');
 tbody.innerHTML = D.previsao.map(r => `
   <tr>

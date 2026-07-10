@@ -353,6 +353,21 @@ if not cc1_re.empty and 'marked_as_done_time' in cc1_re.columns:
             heatmap_matriz[wd][HEATMAP_HORAS.index(hora)] += 1
 heatmap_cc1 = {'dias': HEATMAP_DIAS, 'horas': HEATMAP_HORAS, 'matriz': heatmap_matriz}
 
+# ============= FPQS RECEBIDAS (lista, com link pro Pipedrive) =============
+fpqs_recebidas = []
+if not fpq_re.empty:
+    fq = fpq_re.copy()
+    fq['marked_as_done_time'] = pd.to_datetime(fq['marked_as_done_time'], errors='coerce')
+    fq = fq.dropna(subset=['marked_as_done_time']).sort_values('marked_as_done_time', ascending=False)
+    for _, r in fq.iterrows():
+        fpqs_recebidas.append({
+            'data': r['marked_as_done_time'].strftime('%Y-%m-%d %H:%M'),
+            'closer_nome': None if pd.isna(r.get('closer_nome')) else r.get('closer_nome'),
+            'pessoa_nome': None if pd.isna(r.get('pessoa_nome')) else r.get('pessoa_nome'),
+            'negocio_titulo': None if pd.isna(r.get('negocio_titulo')) else r.get('negocio_titulo'),
+            'deal_link': None if pd.isna(r.get('deal_link')) else r.get('deal_link'),
+        })
+
 # ============= PREVISÃO =============
 previsao_out = []
 if not previsao.empty:
@@ -390,6 +405,7 @@ dashboard = {
     'heatmap_cc1': heatmap_cc1,
     'scoreboard': scoreboard,
     'previsao': previsao_out,
+    'fpqs_recebidas': fpqs_recebidas,
 }
 
 template_path = os.path.join(WORKDIR, 'dashboard_template.html')

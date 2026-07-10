@@ -72,6 +72,9 @@ PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 # pra saber quando entrou; só pega negócios que estão *atualmente* nessa etapa).
 PIPELINE_STAGE_CONTRATO_ENVIADO = 603
 
+# Domínio Pipedrive da conta — usado pra montar link direto pro negócio (ex: nas FPQs recebidas)
+PIPEDRIVE_DOMAIN = 'grupostudioexp.pipedrive.com'
+
 # Campo customizado de negócio: Valor de Caixa (Entrada + Taxa)
 CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'
 

@@ -20,6 +20,7 @@
     --red: #ef4444;
     --purple: #a855f7;
     --yellow: #eab308;
+    --blue: #38bdf8;
   }
   * { box-sizing: border-box; }
   body {
@@ -195,6 +196,7 @@
   .badge.confianca-confiante { background: rgba(34,197,94,.15); color: var(--green); }
   .badge.confianca-quente { background: rgba(213,174,119,.18); color: var(--accent); }
   .badge.confianca-morno { background: rgba(249,115,22,.15); color: var(--orange); }
+  .badge.confianca-frio { background: rgba(56,189,248,.15); color: var(--blue); }
   .badge.confianca-em-duvida { background: rgba(239,68,68,.15); color: var(--red); }
   a.link { color: var(--accent); text-decoration: none; }
   a.link:hover { text-decoration: underline; }
@@ -898,6 +900,7 @@ function confiancaCategoria(v) {
     : (norm.includes('confia') || norm.includes('fechad')) ? 'confiante'
     : norm.includes('quente') ? 'quente'
     : norm.includes('morno') ? 'morno'
+    : norm.includes('frio') ? 'frio'
     : null;
 }
 function confiancaBadge(v) {

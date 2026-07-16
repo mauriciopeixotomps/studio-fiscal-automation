@@ -790,7 +790,14 @@ function relatorioTeamWeeklyRows() {
 }
 function relatorioTeamMonthRow() {
   const row = { label: 'Mês inteiro' };
-  RELATORIO_METRICS.forEach(([key]) => { row[key] = D.consolidado[key] ?? 0; });
+  RELATORIO_METRICS.forEach(([key]) => {
+    // 'leads' aqui é "recebidos via CC1 realizada" (por closer), não o total do
+    // funil (D.consolidado.leads) — soma as linhas dos closers em vez de usar o
+    // consolidado, senão o total não bateria com a soma mostrada acima.
+    row[key] = key === 'leads'
+      ? D.closers.reduce((sum, c) => sum + (c.leads || 0), 0)
+      : (D.consolidado[key] ?? 0);
+  });
   return [row];
 }
 function relatorioRenderTable(elId, rows, totalRow) {

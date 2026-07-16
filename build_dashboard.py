@@ -70,13 +70,15 @@ def pct(a, b):
     return round(100 * a / b, 1)
 
 
-def deals_leads_count(nome):
-    if deals.empty:
+def leads_via_cc1_count(nome):
+    # No Relatório por closer, "Leads" conta só negócios distintos que esse closer
+    # levou a CC1 realizada no mês — não negócios sob responsabilidade dele no
+    # Pipedrive (que inclui coisa fora do funil e sem CC1 ainda). Não confundir com
+    # consolidado['leads'] (total do funil, usado no Ritmo por indicador).
+    if cc1_re.empty or 'closer_nome' not in cc1_re.columns:
         return 0
-    d = deals[deals['closer_nome'] == nome].copy()
-    d['add_time'] = pd.to_datetime(d['add_time'], errors='coerce')
-    mask = (d['add_time'].dt.date >= config.MONTH_START) & (d['add_time'].dt.date <= config.MONTH_END)
-    return int(mask.sum())
+    d = cc1_re[cc1_re['closer_nome'] == nome]
+    return int(d['negocio_id'].nunique())
 
 
 def deals_contratos_count(nome):
@@ -113,7 +115,7 @@ def closer_metrics(nome):
         'cc3_realizada': count_by_closer(cc3_re, nome),
         'cc3_futura': count_by_closer(cc3_fut, nome),
         'contrato_enviado': count_by_closer(contrato_enviado_re, nome),
-        'leads': deals_leads_count(nome),
+        'leads': leads_via_cc1_count(nome),
         'contratos': deals_contratos_count(nome),
     }
     m['conversao'] = {
@@ -128,7 +130,7 @@ closers_out = []
 for c in config.CLOSERS:
     metrics = closer_metrics(c['nome'])
     diario = {
-        'leads': per_closer_daily(deals, 'add_time', c['nome']),
+        'leads': per_closer_daily(cc1_re, 'marked_as_done_time', c['nome']),
         'cc1_realizada': per_closer_daily(cc1_re, 'marked_as_done_time', c['nome']),
         'fpq_realizada': per_closer_daily(fpq_re, 'marked_as_done_time', c['nome']),
         'cc2_realizada': per_closer_daily(cc2_re, 'marked_as_done_time', c['nome']),

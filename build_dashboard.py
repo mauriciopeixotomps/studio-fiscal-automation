@@ -32,6 +32,7 @@ cc3_fut = load('activities_cc3_futura.xlsx')
 fpq_re = load('activities_fpq_realizada.xlsx')
 deals = load('deals.xlsx')
 deals_p62 = load('deals_pipeline62.xlsx')
+outbound = load('deals_outbound.xlsx')
 previsao = load('previsao.xlsx')
 
 if not deals.empty:
@@ -90,6 +91,18 @@ def deals_contratos_count(nome):
     return int(mask.sum())
 
 
+def outbound_assumido_count(nome):
+    # Funil outbound (importação em massa): produtividade = quantos negócios esse
+    # closer assumiu (troca de owner_id) no mês — ver 'assumed_time' em
+    # fetch_pipedrive.py. Ainda sem meta, é só acompanhamento de ritmo.
+    if outbound.empty or 'closer_nome' not in outbound.columns:
+        return 0
+    d = outbound[outbound['closer_nome'] == nome].copy()
+    d['assumed_time'] = pd.to_datetime(d['assumed_time'], errors='coerce')
+    mask = (d['assumed_time'].dt.date >= config.MONTH_START) & (d['assumed_time'].dt.date <= config.MONTH_END)
+    return int(mask.sum())
+
+
 def per_closer_daily(df, date_col, nome, status=None):
     if df.empty or 'closer_nome' not in df.columns or date_col not in df.columns:
         return {}
@@ -117,6 +130,7 @@ def closer_metrics(nome):
         'contrato_enviado': count_by_closer(contrato_enviado_re, nome),
         'leads': leads_via_cc1_count(nome),
         'contratos': deals_contratos_count(nome),
+        'outbound': outbound_assumido_count(nome),
     }
     m['conversao'] = {
         'cc1_para_fpq': pct(m['fpq_realizada'], m['cc1_realizada']),
@@ -137,6 +151,7 @@ for c in config.CLOSERS:
         'cc3_realizada': per_closer_daily(cc3_re, 'marked_as_done_time', c['nome']),
         'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
         'contratos': per_closer_daily(deals, 'won_time', c['nome'], status='won'),
+        'outbound': per_closer_daily(outbound, 'assumed_time', c['nome']),
     }
     closers_out.append({'nome': c['nome'], 'foto': c['foto'], **metrics, 'diario': diario})
 
@@ -151,6 +166,7 @@ consolidado = {
     'contrato_enviado': sum(c['contrato_enviado'] for c in closers_out),
     'leads': sum(c['leads'] for c in closers_out),  # negócios sob responsabilidade dos closers (não é o total do funil — ver 'leads_funil')
     'contratos': sum(c['contratos'] for c in closers_out),
+    'outbound': sum(c['outbound'] for c in closers_out),
 }
 consolidado['conversao'] = {
     'cc1_para_fpq': pct(consolidado['fpq_realizada'], consolidado['cc1_realizada']),

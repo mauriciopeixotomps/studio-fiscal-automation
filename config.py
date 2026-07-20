@@ -57,6 +57,12 @@ ACT_CC3 = 'cc3_realizada'       # id 32 — CC3 Realizada
 
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 
+# Funil novo de outbound (importação em massa) — leads nascem com o importador
+# (Mauricio, user_id abaixo) como "owner" e vão sendo assumidos pelos closers
+# (troca de owner_id) conforme pegam o contato. Ainda sem meta, só produtividade.
+PIPELINE_OUTBOUND_STUDIO_FISCAL = 66
+OUTBOUND_IMPORTADOR_USER_ID = 5808773
+
 # Etapas do pipeline 62, pra referência (IDs reais, confirmados com o time):
 # 593 LEAD, 594 PRÉ-QUALIFICAÇÃO, 595 EM ATENDIMENTO, 596 MQL FRANQUIA (qualificação,
 # CC1 pode ou não estar agendada) -> 597 AGUARDANDO FPQ (CC1 realizada, 1ª etapa do

@@ -172,6 +172,8 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         print(f'   {stage_key} / {CLOSER_NAME.get(closer_id)}: {len(rows)}')
 
 cc1_realizada_rows = []
+all_realizada = {}
+all_futura = {}
 for stage_key, act_type, tem_futura in ACT_STAGES:
     raw = [_correct_activity_tz(a) for a in acts_by_stage[stage_key]]
     done_no_mes = [a for a in raw
@@ -189,21 +191,22 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
             realizada.append(row)
     else:
         realizada = [act_row(a) for a in done_no_mes]
+    all_realizada[stage_key] = realizada
     if stage_key == 'cc1':
         cc1_realizada_rows = realizada
-    else:
-        pd.DataFrame(realizada).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_realizada.xlsx'), index=False)
     print(f'   {stage_key} realizada: {len(realizada)}')
     if tem_futura:
         futura = [act_row(a) for a in raw
                   if not a.get('done') and _in_range(a.get('due_date'), config.MONTH_START, config.MONTH_END)]
-        pd.DataFrame(futura).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_futura.xlsx'), index=False)
+        all_futura[stage_key] = futura
         print(f'   {stage_key} para acontecer: {len(futura)}')
 
-# ============= UTM (campanha/criativo) das CC1 realizada =============
-# Enriquece cada CC1 realizada com a campanha/criativo do negócio vinculado,
-# pra dar pra rankear campanhas/criativos por CC1 gerada.
-print('-> Enriquecendo CC1 realizada com UTM campanha/criativo do negócio...')
+# ============= PIPELINE (e UTM da CC1) do negócio vinculado =============
+# Enriquece TODA atividade (CC1/CC2/CC3/FPQ, realizada e futura) com o pipeline_id
+# do negócio vinculado — pra dar pra separar Studio Fiscal (62) de Outbound (66)
+# sem misturar os números. CC1 realizada também ganha campanha/criativo (UTM) pra
+# ranking. Um único batch deduplicado pra não repetir fetch do mesmo negócio.
+print('-> Enriquecendo atividades com pipeline (e UTM da CC1) do negócio vinculado...')
 
 
 def _fetch_deal_utm(deal_id):
@@ -221,19 +224,27 @@ def _fetch_deal_utm(deal_id):
     return deal_id, None, None, None
 
 
-unique_deal_ids = sorted({r['negocio_id'] for r in cc1_realizada_rows if r.get('negocio_id')})
+all_rows = [r for rows in all_realizada.values() for r in rows] + [r for rows in all_futura.values() for r in rows]
+unique_deal_ids = sorted({r['negocio_id'] for r in all_rows if r.get('negocio_id')})
 utm_by_deal = {}
 if unique_deal_ids:
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
         for deal_id, campanha, criativo, pipeline_id in executor.map(_fetch_deal_utm, unique_deal_ids):
             utm_by_deal[deal_id] = (campanha, criativo, pipeline_id)
 
+for r in all_rows:
+    _, _, pipeline_id = utm_by_deal.get(r.get('negocio_id'), (None, None, None))
+    r['pipeline_id'] = pipeline_id
 for r in cc1_realizada_rows:
-    campanha, criativo, pipeline_id = utm_by_deal.get(r.get('negocio_id'), (None, None, None))
+    campanha, criativo, _ = utm_by_deal.get(r.get('negocio_id'), (None, None, None))
     r['utm_campanha'] = campanha
     r['utm_criativo'] = criativo
-    r['pipeline_id'] = pipeline_id
 
+for stage_key, act_type, tem_futura in ACT_STAGES:
+    if stage_key != 'cc1':
+        pd.DataFrame(all_realizada[stage_key]).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_realizada.xlsx'), index=False)
+    if tem_futura:
+        pd.DataFrame(all_futura[stage_key]).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_futura.xlsx'), index=False)
 pd.DataFrame(cc1_realizada_rows).to_excel(os.path.join(OUT_DIR, 'activities_cc1_realizada.xlsx'), index=False)
 
 # ============= DEALS (leads + contratos) =============
@@ -350,68 +361,39 @@ n_p62_leads = df_p62['add_time'].apply(lambda x: _in_range(x, config.MONTH_START
 n_p62_lost = ((df_p62['status'] == 'lost') & df_p62['lost_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END))).sum() if len(df_p62) else 0
 print(f'   negócios no funil (todos, {len(df_p62)}) | negócios iniciados no mês: {n_p62_leads} | perdidos no mês: {n_p62_lost}')
 
-# ============= OUTBOUND (funil OUTBOUND - STUDIO FISCAL FRANQUIA, pipeline 66) =============
-# Leads importados em massa nascem com o importador (Mauricio) como "owner" até um
-# closer assumir o contato (troca de owner_id) — produtividade aqui é medida por
-# QUANDO cada closer assumiu o negócio (changelog do campo user_id), não por quando
-# foi criado. Se o negócio já nasceu com o closer como dono (sem troca no changelog),
-# usa add_time como fallback. Sem meta ainda, só acompanha ritmo/produtividade.
-print('-> Fetching negócios do funil OUTBOUND - STUDIO FISCAL FRANQUIA (pipeline 66)...')
-outbound_raw = fetch_all(f'pipelines/{config.PIPELINE_OUTBOUND_STUDIO_FISCAL}/deals', {'status': 'all_not_deleted'})
-outbound_lost = [d for d in lost_rows_all if d.get('pipeline_id') == config.PIPELINE_OUTBOUND_STUDIO_FISCAL]
+# ============= NEGÓCIOS DO FUNIL OUTBOUND - STUDIO FISCAL FRANQUIA (pipeline 66, todos) =============
+# Mesma lógica do funil 62 — leads brutos importados nascem com o Mauricio como
+# owner até um closer criar/assumir o negócio (owner_id vira o closer). "Leads" do
+# outbound é contado no build_dashboard.py pelo owner_id atual + add_time no mês.
+print('-> Fetching negócios do funil OUTBOUND - STUDIO FISCAL FRANQUIA (pipeline 66, todos)...')
+p66_raw = fetch_all(f'pipelines/{config.PIPELINE_OUTBOUND_STUDIO_FISCAL}/deals', {'status': 'all_not_deleted'})
+p66_lost = [d for d in lost_rows_all if d.get('pipeline_id') == config.PIPELINE_OUTBOUND_STUDIO_FISCAL]
+print(f'   perdidos no funil 66 (dentre os já buscados no mês): {len(p66_lost)}')
 
-outbound_assumidos = [
-    d for d in outbound_raw + outbound_lost
-    if ((d.get('user_id') or {}).get('id') if isinstance(d.get('user_id'), dict) else d.get('user_id')) in set(config.CLOSER_IDS)
-]
-
-
-def _fetch_assumed_time(deal_id, closer_id):
-    url = f'{BASE}/deals/{deal_id}/changelog?api_token={TOKEN}'
-    for attempt in range(4):
-        try:
-            with urllib.request.urlopen(url, timeout=30) as r:
-                body = json.loads(r.read())
-            changes = body.get('data') or []
-            owner_changes = sorted(
-                (c for c in changes if c.get('field_key') == 'user_id' and str(c.get('new_value')) == str(closer_id)),
-                key=lambda c: c.get('time') or '',
-            )
-            return deal_id, (owner_changes[-1].get('time') if owner_changes else None)
-        except Exception:
-            if attempt == 3:
-                return deal_id, None
-            time.sleep(2 * (attempt + 1))
-    return deal_id, None
-
-
-outbound_rows = []
-if outbound_assumidos:
-    print(f'   {len(outbound_assumidos)} negócios já assumidos por closers — buscando changelog...')
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-        futures = {}
-        for d in outbound_assumidos:
-            owner = d.get('user_id') or {}
-            owner_id = owner.get('id') if isinstance(owner, dict) else owner
-            futures[executor.submit(_fetch_assumed_time, d.get('id'), owner_id)] = d
-        for f in concurrent.futures.as_completed(futures):
-            d = futures[f]
-            _, changelog_time = f.result()
-            owner = d.get('user_id') or {}
-            owner_id = owner.get('id') if isinstance(owner, dict) else owner
-            assumed_time = _fix_dt(changelog_time) if changelog_time else _fix_dt(d.get('add_time'))
-            outbound_rows.append({
-                'deal_id': d.get('id'),
-                'titulo': d.get('title'),
-                'closer_id': owner_id,
-                'closer_nome': CLOSER_NAME.get(owner_id),
-                'status': d.get('status'),
-                'assumed_time': assumed_time,
-            })
-
-df_outbound = pd.DataFrame(outbound_rows)
-df_outbound.to_excel(os.path.join(OUT_DIR, 'deals_outbound.xlsx'), index=False)
-n_outbound_mes = df_outbound['assumed_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_outbound) else 0
-print(f'   negócios assumidos por closers no funil outbound: {len(df_outbound)} | assumidos no mês: {n_outbound_mes}')
+p66_rows = []
+for d in p66_raw + p66_lost:
+    owner = d.get('user_id') or {}
+    p66_rows.append({
+        'deal_id': d.get('id'),
+        'titulo': d.get('title'),
+        'stage_id': d.get('stage_id'),
+        'stage_change_time': _fix_dt(d.get('stage_change_time')),
+        'status': d.get('status'),
+        'add_time': _fix_dt(d.get('add_time')),
+        'lost_time': _fix_dt(d.get('lost_time')),
+        'lost_reason': d.get('lost_reason'),
+        'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
+        'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
+        'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
+        'utm_criativo': d.get(config.CF_UTM_CONTENT),
+    })
+df_p66 = pd.DataFrame(p66_rows)
+df_p66.to_excel(os.path.join(OUT_DIR, 'deals_pipeline66.xlsx'), index=False)
+n_p66_leads = df_p66['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_p66) else 0
+n_p66_leads_closers = (
+    df_p66['owner_id'].isin(config.CLOSER_IDS)
+    & df_p66['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END))
+).sum() if len(df_p66) else 0
+print(f'   negócios no funil outbound (todos, {len(df_p66)}) | criados no mês: {n_p66_leads} | criados no mês já com um closer como dono: {n_p66_leads_closers}')
 
 print(f'\nDados salvos em {OUT_DIR}/')

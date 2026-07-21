@@ -35,6 +35,11 @@
   .logo { height: 30px; width: auto; display: block; margin-bottom: 8px; }
   h1 { font-size: 15px; margin: 0 0 4px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
   .subtitle { color: var(--text-dim); font-size: 14px; }
+  .page-nav-link {
+    background: var(--card-hi); border: 1px solid var(--border); color: var(--accent);
+    font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px; text-decoration: none;
+  }
+  .page-nav-link:hover { border-color: var(--accent); }
   .card {
     background: var(--card);
     border: 1px solid var(--border);
@@ -209,12 +214,13 @@
   <header>
     <div>
       <img src="__LOGO_DATA_URI__" alt="Studio Fiscal" class="logo">
-      <h1>Equipe de Vendas</h1>
+      <h1 id="page-h1">Equipe de Vendas</h1>
       <div class="subtitle" id="subtitle"></div>
     </div>
+    <a class="page-nav-link" id="page-nav-link" href="#"></a>
   </header>
 
-  <div class="card">
+  <div class="card" id="card-placar">
     <h2>Placar do mês <span class="hint">— com base no preenchimento da planilha de previsão (negócio marcado como Ganho no Pipedrive)</span></h2>
     <div class="scoreboard">
       <div class="score-item green">
@@ -235,7 +241,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="card-metas">
     <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (pode diferir do Placar do mês, que conta qualquer negócio da planilha de previsão)</span></h2>
     <div class="meta-grid">
       <div class="meta-block">
@@ -269,7 +275,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="card-ritmo">
     <h2>Ritmo por indicador <span class="hint">— acumulado no mês vs. ritmo ideal (reta até a meta, dividida pelos dias úteis)</span></h2>
     <div class="pace-grid" id="pace-grid"></div>
   </div>
@@ -280,7 +286,7 @@
   </div>
 
   <div class="card">
-    <h2>Perdidos <span class="hint">— negócios perdidos no funil Studio Fiscal Franquia no mês</span></h2>
+    <h2>Perdidos <span class="hint" id="perdidos-hint">— negócios perdidos no funil Studio Fiscal Franquia no mês</span></h2>
     <div class="lost-summary">
       <div class="item"><div class="v" id="lost-total">0</div><div class="l">Total perdidos</div></div>
       <div class="item"><div class="v" id="lost-qualificadora">0</div><div class="l">Perdidos pela Qualificadora</div></div>
@@ -345,7 +351,7 @@
     </div>
   </div>
 
-  <div class="card">
+  <div class="card" id="card-previsao">
     <h2>Previsão <span class="hint">— preenchida manualmente pelo time (planilha)</span></h2>
     <div style="overflow-x:auto">
       <table id="previsao-table">
@@ -401,6 +407,19 @@ function pctStr(v) { return (v === null || v === undefined) ? '—' : v + '%'; }
 
 document.getElementById('subtitle').textContent =
   `${D.mes_label} · ${fmtDate(D.periodo_inicio)} a ${fmtDate(D.periodo_fim)} · atualizado em ${D.gerado_em.replace('T',' ')}`;
+
+// ===== Página (Inbound x Outbound) =====
+document.getElementById('page-h1').textContent = D.pagina_titulo;
+document.getElementById('perdidos-hint').textContent = D.perdidos_hint;
+const pageNav = document.getElementById('page-nav-link');
+pageNav.href = D.pagina_outra_url;
+pageNav.textContent = D.pagina_outra_label;
+if (!D.tem_meta) {
+  ['card-placar', 'card-metas', 'card-ritmo', 'card-previsao'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+}
 
 // ===== Placar (planilha de previsão) =====
 function scoreSubHtml(previsto, realizado, fmt) {
@@ -705,7 +724,6 @@ document.getElementById('ranking-criativos').innerHTML =
 
 // ===== Relatório por closer (diário / semanal / mês) =====
 const RELATORIO_METRICS = [
-  ['outbound', 'Outbound assumido'],
   ['leads', 'Leads'],
   ['cc1_realizada', 'CC1 realizada'],
   ['cc1_futura', 'CC1 a acontecer', true],

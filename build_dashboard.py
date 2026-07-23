@@ -44,6 +44,8 @@ if not deals_p62.empty:
     deals_p62 = deals_p62[~deals_p62['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not deals_p66.empty:
     deals_p66 = deals_p66[~deals_p66['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+if not previsao.empty:
+    previsao = previsao[~previsao['deal_id'].isin(config.PREVISAO_EXCLUIDOS)]
 
 if not os.path.exists(os.path.join(WORKDIR, config.METAS_FILE)):
     raise RuntimeError(
@@ -222,9 +224,12 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
         diario = {
             'leads': leads_diario(c['nome']),
             'cc1_realizada': per_closer_daily(cc1_p, 'marked_as_done_time', c['nome']),
+            'cc1_futura': per_closer_daily(cc1_fut_p, 'due_date', c['nome']),
             'fpq_realizada': per_closer_daily(fpq_p, 'marked_as_done_time', c['nome']),
             'cc2_realizada': per_closer_daily(cc2_p, 'marked_as_done_time', c['nome']),
+            'cc2_futura': per_closer_daily(cc2_fut_p, 'due_date', c['nome']),
             'cc3_realizada': per_closer_daily(cc3_p, 'marked_as_done_time', c['nome']),
+            'cc3_futura': per_closer_daily(cc3_fut_p, 'due_date', c['nome']),
             'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
             'contratos': per_closer_daily(deals_pipe, 'won_time', c['nome'], status='won'),
         }

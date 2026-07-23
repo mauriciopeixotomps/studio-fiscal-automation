@@ -104,6 +104,12 @@ CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 #   massa/erro de dados, não fechamento real, confirmado com o time (03/07/2026).
 DEALS_EXCLUIDOS = {57206, 84764, 92183}
 
+# deal_id da planilha de Previsão pra desconsiderar do Placar do mês (e da própria
+# tabela de Previsão) — não mexe na planilha em si, só filtra na leitura.
+# - 90987 (Sandro/Émerson): venda da Studio Fiscal, mas Émerson já é da Studio Agro
+#   agora — o time pediu pra não contar mais aqui na Fiscal (21/07/2026).
+PREVISAO_EXCLUIDOS = {90987}
+
 # ============= CONVERSÃO DE REFERÊNCIA (quadro do time, "conta pra cada contrato") =============
 # 100 leads -> 15 CC1 realizada -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 contrato fechado.
 # Usado pra estimar as metas de CC1/FPQ/CC2/CC3 em cascata a partir da meta de leads,

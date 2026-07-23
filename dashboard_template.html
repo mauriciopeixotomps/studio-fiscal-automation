@@ -726,12 +726,12 @@ document.getElementById('ranking-criativos').innerHTML =
 const RELATORIO_METRICS = [
   ['leads', 'Leads'],
   ['cc1_realizada', 'CC1 realizada'],
-  ['cc1_futura', 'CC1 a acontecer', true],
+  ['cc1_futura', 'CC1 a acontecer'],
   ['fpq_realizada', 'FPQ recebida'],
   ['cc2_realizada', 'CC2 realizada'],
-  ['cc2_futura', 'CC2 a acontecer', true],
+  ['cc2_futura', 'CC2 a acontecer'],
   ['cc3_realizada', 'CC3 realizada'],
-  ['cc3_futura', 'CC3 a acontecer', true],
+  ['cc3_futura', 'CC3 a acontecer'],
   ['contrato_enviado', 'Contrato enviado'],
   ['contratos', 'Contratos fechados'],
 ];
@@ -893,7 +893,7 @@ document.getElementById('relatorio-sort-dir').addEventListener('click', function
 
 const relatorioDataInput = document.getElementById('relatorio-data');
 relatorioDataInput.min = D.periodo_inicio;
-relatorioDataInput.max = TODAY_ISO < D.periodo_fim ? TODAY_ISO : D.periodo_fim;
+relatorioDataInput.max = D.periodo_fim;
 relatorioDataInput.addEventListener('change', () => {
   if (!relatorioDataInput.value) return;
   relatorioPeriod = 'diario';

@@ -724,18 +724,7 @@ document.getElementById('ranking-criativos').innerHTML =
 })();
 
 // ===== Relatório por closer (diário / semanal / mês) =====
-const RELATORIO_METRICS = [
-  ['leads', 'Leads'],
-  ['cc1_realizada', 'CC1 realizada'],
-  ['cc1_futura', 'CC1 a acontecer'],
-  ['fpq_realizada', 'FPQ recebida'],
-  ['cc2_realizada', 'CC2 realizada'],
-  ['cc2_futura', 'CC2 a acontecer'],
-  ['cc3_realizada', 'CC3 realizada'],
-  ['cc3_futura', 'CC3 a acontecer'],
-  ['contrato_enviado', 'Contrato enviado'],
-  ['contratos', 'Contratos fechados'],
-];
+const RELATORIO_METRICS = D.relatorio_metrics;
 
 function relatorioMondayOf(iso) {
   const d = new Date(iso + 'T00:00:00');
@@ -810,14 +799,7 @@ function relatorioTeamWeeklyRows() {
 }
 function relatorioTeamMonthRow() {
   const row = { label: 'Mês inteiro' };
-  RELATORIO_METRICS.forEach(([key]) => {
-    // 'leads' aqui é "recebidos via CC1 realizada" (por closer), não o total do
-    // funil (D.consolidado.leads) — soma as linhas dos closers em vez de usar o
-    // consolidado, senão o total não bateria com a soma mostrada acima.
-    row[key] = key === 'leads'
-      ? D.closers.reduce((sum, c) => sum + (c.leads || 0), 0)
-      : (D.consolidado[key] ?? 0);
-  });
+  RELATORIO_METRICS.forEach(([key]) => { row[key] = D.consolidado[key] ?? 0; });
   return [row];
 }
 function relatorioRenderTable(elId, rows, totalRow) {

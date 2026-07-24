@@ -459,11 +459,20 @@ dashboard_inbound = {
     'pagina_outra_url': 'outbound.html',
     'pagina_outra_label': 'Ver Outbound →',
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
-    'relatorio_hint': (
-        '— diário, semanal e consolidado do mês. "Leads" conta negócios distintos com '
-        'CC1 realizada no mês (pode ser menor que CC1 realizada se algum negócio teve '
-        'mais de uma CC1 remarcada)'
-    ),
+    'relatorio_hint': '— diário, semanal e consolidado do mês',
+    # Sem "Leads" aqui — nesse funil ele é quase sempre igual a CC1 realizada
+    # (só diverge se um negócio teve CC1 remarcada), então virou coluna redundante.
+    'relatorio_metrics': [
+        ['cc1_realizada', 'CC1 realizada'],
+        ['cc1_futura', 'CC1 a acontecer'],
+        ['fpq_realizada', 'FPQ recebida'],
+        ['cc2_realizada', 'CC2 realizada'],
+        ['cc2_futura', 'CC2 a acontecer'],
+        ['cc3_realizada', 'CC3 realizada'],
+        ['cc3_futura', 'CC3 a acontecer'],
+        ['contrato_enviado', 'Contrato enviado'],
+        ['contratos', 'Contratos fechados'],
+    ],
 }
 dashboard_outbound = {
     **common,
@@ -476,6 +485,20 @@ dashboard_outbound = {
         '— diário, semanal e consolidado do mês. "Leads" conta negócios do funil '
         'Outbound criados no mês já com um closer como dono'
     ),
+    # Aqui "Leads" continua — ainda não tem CC1 nesse funil, então é a única
+    # métrica de produtividade disponível por enquanto.
+    'relatorio_metrics': [
+        ['leads', 'Leads'],
+        ['cc1_realizada', 'CC1 realizada'],
+        ['cc1_futura', 'CC1 a acontecer'],
+        ['fpq_realizada', 'FPQ recebida'],
+        ['cc2_realizada', 'CC2 realizada'],
+        ['cc2_futura', 'CC2 a acontecer'],
+        ['cc3_realizada', 'CC3 realizada'],
+        ['cc3_futura', 'CC3 a acontecer'],
+        ['contrato_enviado', 'Contrato enviado'],
+        ['contratos', 'Contratos fechados'],
+    ],
 }
 
 

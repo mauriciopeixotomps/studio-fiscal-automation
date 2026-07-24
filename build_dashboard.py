@@ -459,6 +459,11 @@ dashboard_inbound = {
     'pagina_outra_url': 'outbound.html',
     'pagina_outra_label': 'Ver Outbound →',
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
+    'relatorio_hint': (
+        '— diário, semanal e consolidado do mês. "Leads" conta negócios distintos com '
+        'CC1 realizada no mês (pode ser menor que CC1 realizada se algum negócio teve '
+        'mais de uma CC1 remarcada)'
+    ),
 }
 dashboard_outbound = {
     **common,
@@ -467,6 +472,10 @@ dashboard_outbound = {
     'pagina_outra_url': 'index.html',
     'pagina_outra_label': '← Ver Studio Fiscal (Inbound)',
     'perdidos_hint': '— negócios perdidos no funil Outbound Studio Fiscal no mês',
+    'relatorio_hint': (
+        '— diário, semanal e consolidado do mês. "Leads" conta negócios do funil '
+        'Outbound criados no mês já com um closer como dono'
+    ),
 }
 
 

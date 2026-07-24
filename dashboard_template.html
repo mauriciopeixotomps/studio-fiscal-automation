@@ -324,7 +324,7 @@
   </div>
 
   <div class="card">
-    <h2>Relatório por closer <span class="hint">— diário, semanal e consolidado do mês</span></h2>
+    <h2>Relatório por closer <span class="hint" id="relatorio-hint">— diário, semanal e consolidado do mês</span></h2>
     <div class="relatorio-toolbar">
       <div class="relatorio-tabs" id="relatorio-tabs-global">
         <button class="rtab" data-period="diario">Diário</button>
@@ -411,6 +411,7 @@ document.getElementById('subtitle').textContent =
 // ===== Página (Inbound x Outbound) =====
 document.getElementById('page-h1').textContent = D.pagina_titulo;
 document.getElementById('perdidos-hint').textContent = D.perdidos_hint;
+document.getElementById('relatorio-hint').textContent = D.relatorio_hint;
 const pageNav = document.getElementById('page-nav-link');
 pageNav.href = D.pagina_outra_url;
 pageNav.textContent = D.pagina_outra_label;

@@ -45,6 +45,9 @@ git clone -q "https://x-access-token:${TOKEN}@github.com/$OWNER/$REPO.git" "$TMP
 cd "$TMP_REPO"
 cp "$PUBLISH/index.html" .
 cp "$PUBLISH/outbound.html" .
+# Páginas de meses arquivados (ex: julho-2026.html) — copia se existirem localmente,
+# uma vez publicadas ficam pra sempre no repo (build_dashboard.py não regenera).
+cp "$PUBLISH"/*-2026.html . 2>/dev/null || true
 
 # 4) Commit & push (só se houver mudanças)
 git -c user.name="Mauricio Peixoto" -c user.email="mauricio.peixoto.mps@gmail.com" add -A

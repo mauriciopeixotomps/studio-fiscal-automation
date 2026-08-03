@@ -1,9 +1,18 @@
 """Configuração do Dashboard Studio Fiscal — equipe de vendas (closers)."""
 from datetime import date
 import calendar
+import os
 
 # ============= PERÍODO (mês corrente) =============
-_today = date.today()
+# DASHBOARD_MONTH (env var, formato 'AAAA-MM') força o mês pra gerar uma página
+# congelada de um mês já fechado (ex: arquivar julho antes de virar pra agosto),
+# sem depender da data real do sistema. Uso normal (automação) não define isso.
+_month_override = os.environ.get('DASHBOARD_MONTH')
+if _month_override:
+    _override_year, _override_month = map(int, _month_override.split('-'))
+    _today = date(_override_year, _override_month, 1)
+else:
+    _today = date.today()
 MONTH_START = date(_today.year, _today.month, 1)
 MONTH_END = date(_today.year, _today.month, calendar.monthrange(_today.year, _today.month)[1])
 MONTH_LABEL = {

@@ -185,17 +185,41 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
         contrato_enviado_re = deals_p[deals_p['stage_id'] == stage_contrato_enviado].copy()
         contrato_enviado_re = contrato_enviado_re[contrato_enviado_re['closer_nome'].notna()]
 
+    def negocios_iniciados_por_deal(nome):
+        """"Negócios iniciados" = união deduplicada de negócios que esse closer levou
+        a CC1 realizada no mês OU que foram adicionados no funil Expansão Franquia
+        (deals_p) já com ele como dono no mês — pega a data mais antiga entre as duas
+        fontes, pra não contar o mesmo negócio duas vezes nem no dia errado."""
+        by_deal = {}
+        if not cc1_p.empty and 'closer_nome' in cc1_p.columns:
+            d = cc1_p[cc1_p['closer_nome'] == nome].copy()
+            d['marked_as_done_time'] = pd.to_datetime(d['marked_as_done_time'], errors='coerce')
+            for _, r in d.dropna(subset=['marked_as_done_time']).iterrows():
+                deal_id = r.get('negocio_id')
+                day = r['marked_as_done_time'].date()
+                if pd.notna(deal_id) and config.MONTH_START <= day <= config.MONTH_END:
+                    by_deal[deal_id] = min(day, by_deal.get(deal_id, day))
+        if not deals_p.empty:
+            d = deals_p[deals_p['closer_nome'] == nome].copy()
+            d['add_time'] = pd.to_datetime(d['add_time'], errors='coerce')
+            for _, r in d.dropna(subset=['add_time']).iterrows():
+                deal_id = r.get('deal_id')
+                day = r['add_time'].date()
+                if pd.notna(deal_id) and config.MONTH_START <= day <= config.MONTH_END:
+                    by_deal[deal_id] = min(day, by_deal.get(deal_id, day))
+        return by_deal
+
     def leads_count(nome):
-        if leads_mode == 'cc1':
-            if cc1_p.empty or 'closer_nome' not in cc1_p.columns:
-                return 0
-            d = cc1_p[cc1_p['closer_nome'] == nome]
-            return int(d['negocio_id'].nunique())
+        if leads_mode == 'iniciados':
+            return len(negocios_iniciados_por_deal(nome))
         return sum(per_closer_daily(deals_p, 'add_time', nome).values())
 
     def leads_diario(nome):
-        if leads_mode == 'cc1':
-            return per_closer_daily(cc1_p, 'marked_as_done_time', nome)
+        if leads_mode == 'iniciados':
+            out = {}
+            for day in negocios_iniciados_por_deal(nome).values():
+                out[day.isoformat()] = out.get(day.isoformat(), 0) + 1
+            return out
         return per_closer_daily(deals_p, 'add_time', nome)
 
     def closer_metrics(nome):
@@ -297,7 +321,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
 
     pace = {
         'leads': {
-            'label': 'Leads', 'meta': meta_leads, 'estimado': False,
+            'label': 'Negócios iniciados', 'meta': meta_leads, 'estimado': False,
             'daily': daily_leads, 'ideal_cumulative': ideal_cumulative(meta_leads, n_dias_uteis_total),
         },
         'cc1': {
@@ -437,7 +461,7 @@ inbound_data = build_page(
     pipeline_id=config.PIPELINE_STUDIO_FISCAL_FRANQUIA,
     deals_p=deals_p62,
     stage_contrato_enviado=config.PIPELINE_STAGE_CONTRATO_ENVIADO,
-    leads_mode='cc1',
+    leads_mode='iniciados',
     meta_leads=metas.get('meta_leads'),
     meta_contratos_val=metas['meta_contratos'],
     tem_meta=True,
@@ -472,10 +496,13 @@ dashboard_inbound = {
     'mes_outro_url': MES_ANTERIOR_ARQUIVO,
     'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
-    'relatorio_hint': '— diário, semanal e consolidado do mês',
-    # Sem "Leads" aqui — nesse funil ele é quase sempre igual a CC1 realizada
-    # (só diverge se um negócio teve CC1 remarcada), então virou coluna redundante.
+    'relatorio_hint': (
+        '— diário, semanal e consolidado do mês. "Negócios iniciados" conta a união '
+        '(sem duplicar) de negócios que o closer levou a CC1 realizada no mês OU que '
+        'entraram no funil Expansão Franquia Studio Fiscal já com ele como dono no mês'
+    ),
     'relatorio_metrics': [
+        ['leads', 'Negócios iniciados'],
         ['cc1_realizada', 'CC1 realizada'],
         ['cc1_futura', 'CC1 a acontecer'],
         ['fpq_realizada', 'FPQ recebida'],

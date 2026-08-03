@@ -217,7 +217,10 @@
       <h1 id="page-h1">Equipe de Vendas</h1>
       <div class="subtitle" id="subtitle"></div>
     </div>
-    <a class="page-nav-link" id="page-nav-link" href="#"></a>
+    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+      <a class="page-nav-link" id="month-nav-link" href="#" style="display:none;"></a>
+      <a class="page-nav-link" id="page-nav-link" href="#"></a>
+    </div>
   </header>
 
   <div class="card" id="card-placar">
@@ -415,6 +418,12 @@ document.getElementById('relatorio-hint').textContent = D.relatorio_hint;
 const pageNav = document.getElementById('page-nav-link');
 pageNav.href = D.pagina_outra_url;
 pageNav.textContent = D.pagina_outra_label;
+if (D.mes_outro_url) {
+  const monthNav = document.getElementById('month-nav-link');
+  monthNav.href = D.mes_outro_url;
+  monthNav.textContent = D.mes_outro_label;
+  monthNav.style.display = '';
+}
 if (!D.tem_meta) {
   ['card-placar', 'card-metas', 'card-ritmo', 'card-previsao'].forEach(id => {
     const el = document.getElementById(id);

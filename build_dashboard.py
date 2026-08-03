@@ -452,12 +452,25 @@ outbound_data = build_page(
     tem_meta=False,
 )
 
+# Link pro mês fechado mais recente (atualizar aqui a cada virada de mês, depois
+# de gerar o arquivo congelado com DASHBOARD_MONTH — ver README/histórico de chat).
+# Ao gerar o próprio arquivo congelado (DASHBOARD_MONTH setado), não faz sentido a
+# página apontar pra si mesma — fica None aqui, e o link de volta pro mês atual é
+# aplicado manualmente depois (patch no HTML gerado), já que build_dashboard.py não
+# sabe o nome do arquivo do mês "atual" quando está rodando em modo arquivado.
+_arquivando_mes_passado = bool(os.environ.get('DASHBOARD_MONTH'))
+MES_ANTERIOR_ARQUIVO = None if _arquivando_mes_passado else 'julho-2026.html'
+MES_ANTERIOR_ARQUIVO_OUTBOUND = None if _arquivando_mes_passado else 'outbound-julho-2026.html'
+MES_ANTERIOR_LABEL = 'Ver Julho (fechado) →'
+
 dashboard_inbound = {
     **common,
     **inbound_data,
     'pagina_titulo': 'Equipe de Vendas — Studio Fiscal',
     'pagina_outra_url': 'outbound.html',
     'pagina_outra_label': 'Ver Outbound →',
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
     'relatorio_hint': '— diário, semanal e consolidado do mês',
     # Sem "Leads" aqui — nesse funil ele é quase sempre igual a CC1 realizada
@@ -480,6 +493,8 @@ dashboard_outbound = {
     'pagina_titulo': 'Equipe de Vendas — Outbound',
     'pagina_outra_url': 'index.html',
     'pagina_outra_label': '← Ver Studio Fiscal (Inbound)',
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO_OUTBOUND,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Outbound Studio Fiscal no mês',
     'relatorio_hint': (
         '— diário, semanal e consolidado do mês. "Leads" conta negócios do funil '

@@ -6,10 +6,24 @@ já estiver Ganho.
 Gera /data_pipedrive/previsao.xlsx
 """
 import urllib.request, urllib.parse, json, os, re, time
+from datetime import timedelta
 import pandas as pd
 import io
 
 import config
+
+# Mesma correção de fuso (-3h) do fetch_pipedrive.py — a API do Pipedrive devolve
+# TODO campo de data/hora 3h à frente do horário real de Brasília nessa conta.
+TZ_OFFSET = timedelta(hours=3)
+
+
+def _fix_dt(dt_str):
+    if not dt_str:
+        return dt_str
+    try:
+        return (pd.to_datetime(dt_str) - TZ_OFFSET).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        return dt_str
 
 WORKDIR = os.path.dirname(os.path.abspath(__file__))
 TOKEN_FILE = os.path.join(WORKDIR, '.pipedrive_token')
@@ -105,6 +119,7 @@ for _, r in df.iterrows():
     venda_realizada = None
     caixa_realizado = None
     deal_status = None
+    won_time = None
     if deal_id:
         d = _fetch_deal(deal_id)
         if d:
@@ -112,9 +127,12 @@ for _, r in df.iterrows():
             if deal_status == 'won':
                 venda_realizada = d.get('value')
                 caixa_realizado = d.get(config.CF_CAIXA)
+                won_time = _fix_dt(d.get('won_time'))
     else:
         # Sem link válido do Pipedrive (célula tem nome/e-mail em vez da URL) —
-        # usa o status preenchido manualmente na planilha como fallback.
+        # usa o status preenchido manualmente na planilha como fallback. Sem
+        # won_time nesse caso (não tem negócio no Pipedrive pra consultar), então
+        # não entra no Placar do mês (que exige won_time no mês corrente).
         status_texto = str(r.get('Satus') or r.get('Status') or '').strip().lower()
         if 'fechado' in status_texto or 'ganho' in status_texto:
             deal_status = 'won'
@@ -137,6 +155,7 @@ for _, r in df.iterrows():
         'deal_status': deal_status,
         'venda_realizada': venda_realizada,
         'caixa_realizado': caixa_realizado,
+        'won_time': won_time,
     })
 
 df_out = pd.DataFrame(rows)

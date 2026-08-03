@@ -136,12 +136,27 @@ if not previsao.empty:
                 row[k] = None
         previsao_out.append(row)
 
-# Placar com base no preenchimento da planilha de previsão: só conta como "fechado"
-# quando o negócio vinculado ("Link do pipe") já está Ganho no Pipedrive.
+# Placar (Contratos/Venda/Caixa fechados) considera só negócios Ganhos no Pipedrive
+# COM won_time dentro do mês corrente — não é "alguma hora ficou Ganho" (isso
+# deixaria fechamentos de meses passados aparecendo pra sempre no Placar de todo
+# mês seguinte). A tabela de Previsão em si continua mostrando tudo da planilha,
+# sem filtro de mês (é a lista de trabalho do time, não um relatório mensal).
+def _fechado_no_mes(r):
+    wt = r.get('won_time')
+    if not wt:
+        return False
+    try:
+        d = pd.to_datetime(wt).date()
+        return config.MONTH_START <= d <= config.MONTH_END
+    except Exception:
+        return False
+
+
+previsao_fechados_no_mes = [r for r in previsao_out if _fechado_no_mes(r)]
 scoreboard = {
-    'contratos_fechados': sum(1 for r in previsao_out if r.get('venda_realizada') is not None),
-    'venda_realizada_total': sum(r.get('venda_realizada') or 0 for r in previsao_out),
-    'caixa_realizado_total': sum(r.get('caixa_realizado') or 0 for r in previsao_out),
+    'contratos_fechados': len(previsao_fechados_no_mes),
+    'venda_realizada_total': sum(r.get('venda_realizada') or 0 for r in previsao_fechados_no_mes),
+    'caixa_realizado_total': sum(r.get('caixa_realizado') or 0 for r in previsao_fechados_no_mes),
     'contratos_previstos': len(previsao_out),
     'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_out),
     'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_out),
@@ -277,18 +292,31 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
         'cc2_para_cc3': pct(consolidado['cc3_realizada'], consolidado['cc2_realizada']),
     }
 
-    # "Negócios iniciados" (leads, pro Ritmo/Metas) = TODO negócio criado no funil no
-    # mês, independente do responsável.
-    daily_leads = {}
+    # Total do funil (todo negócio criado no mês, qualquer dono — inclui SDR/
+    # Qualificadora) — guardado só como referência (leads_funil), não usado como
+    # "Negócios iniciados" no modo 'iniciados' (ver abaixo).
+    daily_leads_funil = {}
     if not deals_p.empty:
         d = deals_p.copy()
         d['add_time'] = pd.to_datetime(d['add_time'], errors='coerce').dt.date
         for day in d['add_time'].dropna():
             if config.MONTH_START <= day <= config.MONTH_END:
-                daily_leads[day.isoformat()] = daily_leads.get(day.isoformat(), 0) + 1
-    consolidado['leads_funil'] = sum(daily_leads.values())
+                daily_leads_funil[day.isoformat()] = daily_leads_funil.get(day.isoformat(), 0) + 1
+    consolidado['leads_funil'] = sum(daily_leads_funil.values())
     consolidado['leads_atribuidos_closers'] = consolidado['leads']
-    consolidado['leads'] = consolidado['leads_funil']
+
+    if leads_mode == 'iniciados':
+        # "Negócios iniciados" no Ritmo/Metas usa a MESMA definição do Relatório por
+        # closer (só o que entrou na propriedade de um dos 4 closers — SDR/
+        # Qualificadora não conta), não o total do funil. consolidado['leads'] já é
+        # a soma dos closers (calculada acima), não sobrescreve.
+        daily_leads = {}
+        for c in closers_out:
+            for day, count in c['diario']['leads'].items():
+                daily_leads[day] = daily_leads.get(day, 0) + count
+    else:
+        daily_leads = daily_leads_funil
+        consolidado['leads'] = consolidado['leads_funil']
 
     daily_contrato_enviado = daily_series(contrato_enviado_re, 'stage_change_time')
 

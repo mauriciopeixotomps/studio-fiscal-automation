@@ -111,7 +111,12 @@ CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 # - 84764, 92183: marcados "Ganho" (valor R$0) ainda em estágio inicial da
 #   Qualificadora (LEAD/PRÉ-QUALIFICAÇÃO), no mesmo minuto — parece marcação em
 #   massa/erro de dados, não fechamento real, confirmado com o time (03/07/2026).
-DEALS_EXCLUIDOS = {57206, 84764, 92183}
+# - 95176 (Nelson/Leonardo): fechado de verdade em julho (won_time 31/07), o
+#   Pipedrive reabriu sozinho em 05/08 e o Leonardo deu Ganho de novo no mesmo dia
+#   — já contado no arquivo congelado de julho (julho-2026.html), excluído aqui
+#   pra não contar de novo como fechamento de agosto (confirmado com o time,
+#   05/08/2026).
+DEALS_EXCLUIDOS = {57206, 84764, 92183, 95176}
 
 # deal_id da planilha de Previsão pra desconsiderar do Placar do mês (e da própria
 # tabela de Previsão) — não mexe na planilha em si, só filtra na leitura.

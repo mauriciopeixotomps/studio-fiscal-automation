@@ -224,7 +224,7 @@
   </header>
 
   <div class="card" id="card-placar">
-    <h2>Placar do mês <span class="hint">— com base no preenchimento da planilha de previsão (negócio marcado como Ganho no Pipedrive)</span></h2>
+    <h2>Placar do mês <span class="hint">— Realizado vem direto do Pipedrive (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão</span></h2>
     <div class="scoreboard">
       <div class="score-item green">
         <div class="lbl">Contratos fechados</div>
@@ -245,7 +245,7 @@
   </div>
 
   <div class="card" id="card-metas">
-    <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (pode diferir do Placar do mês, que conta qualquer negócio da planilha de previsão)</span></h2>
+    <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (mesmo número do "Contratos fechados" do Placar do mês)</span></h2>
     <div class="meta-grid">
       <div class="meta-block">
         <h3>Negócios iniciados Studio Fiscal</h3>
@@ -416,8 +416,12 @@ document.getElementById('page-h1').textContent = D.pagina_titulo;
 document.getElementById('perdidos-hint').textContent = D.perdidos_hint;
 document.getElementById('relatorio-hint').textContent = D.relatorio_hint;
 const pageNav = document.getElementById('page-nav-link');
-pageNav.href = D.pagina_outra_url;
-pageNav.textContent = D.pagina_outra_label;
+if (D.pagina_outra_url) {
+  pageNav.href = D.pagina_outra_url;
+  pageNav.textContent = D.pagina_outra_label;
+} else {
+  pageNav.style.display = 'none';
+}
 if (D.mes_outro_url) {
   const monthNav = document.getElementById('month-nav-link');
   monthNav.href = D.mes_outro_url;

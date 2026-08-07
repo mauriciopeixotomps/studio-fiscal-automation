@@ -136,27 +136,12 @@ if not previsao.empty:
                 row[k] = None
         previsao_out.append(row)
 
-# Placar (Contratos/Venda/Caixa fechados) considera só negócios Ganhos no Pipedrive
-# COM won_time dentro do mês corrente — não é "alguma hora ficou Ganho" (isso
-# deixaria fechamentos de meses passados aparecendo pra sempre no Placar de todo
-# mês seguinte). A tabela de Previsão em si continua mostrando tudo da planilha,
-# sem filtro de mês (é a lista de trabalho do time, não um relatório mensal).
-def _fechado_no_mes(r):
-    wt = r.get('won_time')
-    if not wt:
-        return False
-    try:
-        d = pd.to_datetime(wt).date()
-        return config.MONTH_START <= d <= config.MONTH_END
-    except Exception:
-        return False
-
-
-previsao_fechados_no_mes = [r for r in previsao_out if _fechado_no_mes(r)]
-scoreboard = {
-    'contratos_fechados': len(previsao_fechados_no_mes),
-    'venda_realizada_total': sum(r.get('venda_realizada') or 0 for r in previsao_fechados_no_mes),
-    'caixa_realizado_total': sum(r.get('caixa_realizado') or 0 for r in previsao_fechados_no_mes),
+# Placar do mês: "Previsto" continua vindo da planilha de Previsão (compartilhado,
+# não é por pipeline — é a lista de trabalho manual do time). "Realizado" (Contratos
+# fechados/Venda/Caixa) agora vem DIRETO do Pipedrive — mesmo negócio Ganho no mês
+# que o card "Metas do mês" já conta — em vez de depender de alguém preencher a
+# planilha com o link certo. Isso é calculado dentro de build_page() (por pipeline).
+scoreboard_previsto = {
     'contratos_previstos': len(previsao_out),
     'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_out),
     'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_out),
@@ -461,6 +446,21 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
                 'deal_link': None if pd.isna(r.get('deal_link')) else r.get('deal_link'),
             })
 
+    # ============= PLACAR DO MÊS — "Realizado" direto do Pipedrive =============
+    # Mesmo escopo do "Contratos fechados" do Metas do mês (Ganho, won_time no mês
+    # corrente, negócio desse pipeline, excluídos os de config.DEALS_EXCLUIDOS) —
+    # não depende mais de alguém preencher a planilha com o link certo.
+    dw = deals_pipe[deals_pipe['status'] == 'won'].copy() if not deals_pipe.empty else deals_pipe
+    if not dw.empty:
+        dw['won_time'] = pd.to_datetime(dw['won_time'], errors='coerce')
+        dw = dw[(dw['won_time'].dt.date >= config.MONTH_START) & (dw['won_time'].dt.date <= config.MONTH_END)]
+    scoreboard = {
+        **scoreboard_previsto,
+        'contratos_fechados': int(len(dw)),
+        'venda_realizada_total': float(dw['valor'].fillna(0).sum()) if not dw.empty else 0.0,
+        'caixa_realizado_total': float(dw['caixa'].fillna(0).sum()) if not dw.empty else 0.0,
+    }
+
     return {
         'meta_contratos': meta_contratos_val,
         'meta_leads': meta_leads,
@@ -472,6 +472,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
         'ranking': ranking,
         'heatmap_cc1': heatmap_cc1,
         'fpqs_recebidas': fpqs_recebidas,
+        'scoreboard': scoreboard,
     }
 
 
@@ -481,7 +482,6 @@ common = {
     'periodo_fim': config.MONTH_END.isoformat(),
     'gerado_em': pd.Timestamp.now(tz=ZoneInfo('America/Sao_Paulo')).strftime('%Y-%m-%dT%H:%M'),
     'ritmo': ritmo,
-    'scoreboard': scoreboard,
     'previsao': previsao_out,
 }
 

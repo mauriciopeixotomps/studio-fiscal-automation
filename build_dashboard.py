@@ -504,16 +504,39 @@ outbound_data = build_page(
     tem_meta=False,
 )
 
-# Link pro mês fechado mais recente (atualizar aqui a cada virada de mês, depois
-# de gerar o arquivo congelado com DASHBOARD_MONTH — ver README/histórico de chat).
-# Ao gerar o próprio arquivo congelado (DASHBOARD_MONTH setado), não faz sentido a
-# página apontar pra si mesma — fica None aqui, e o link de volta pro mês atual é
-# aplicado manualmente depois (patch no HTML gerado), já que build_dashboard.py não
-# sabe o nome do arquivo do mês "atual" quando está rodando em modo arquivado.
-_arquivando_mes_passado = bool(os.environ.get('DASHBOARD_MONTH'))
-MES_ANTERIOR_ARQUIVO = None if _arquivando_mes_passado else 'julho-2026.html'
-MES_ANTERIOR_ARQUIVO_OUTBOUND = None if _arquivando_mes_passado else 'outbound-julho-2026.html'
-MES_ANTERIOR_LABEL = 'Ver Julho (fechado) →'
+# ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
+# Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM
+# num arquivo próprio (ex: agosto-2026.html), além do index.html normal — com os
+# MESMOS dados. Isso é o que garante o congelamento: assim que o mês vira, o próximo
+# ciclo passa a calcular um MONTH_START/END diferente (via config.py) e escreve num
+# nome de arquivo diferente (setembro-2026.html) — o arquivo do mês anterior simplesmente
+# para de ser tocado, ficando congelado sozinho com o último estado gravado antes da
+# virada (a planilha de Previsão pode continuar a mesma, sendo reaproveitada mês a mês,
+# sem afetar o que já foi congelado). Não depende de ninguém lembrar de rodar nada
+# manualmente no fim do mês.
+_MES_NOMES = {1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 6: 'junho',
+              7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'}
+
+
+def _arquivo_mes(ano, mes, outbound=False):
+    nome = _MES_NOMES[mes]
+    return f'outbound-{nome}-{ano}.html' if outbound else f'{nome}-{ano}.html'
+
+
+_cur_ano, _cur_mes = config.MONTH_START.year, config.MONTH_START.month
+_prev_mes = 12 if _cur_mes == 1 else _cur_mes - 1
+_prev_ano = _cur_ano - 1 if _cur_mes == 1 else _cur_ano
+
+ARQUIVO_MES_ATUAL = _arquivo_mes(_cur_ano, _cur_mes)
+ARQUIVO_MES_ATUAL_OUTBOUND = _arquivo_mes(_cur_ano, _cur_mes, outbound=True)
+
+_arq_anterior = _arquivo_mes(_prev_ano, _prev_mes)
+_arq_anterior_ob = _arquivo_mes(_prev_ano, _prev_mes, outbound=True)
+# Só linka pro mês anterior se o arquivo já existir (evita link morto no primeiro
+# ciclo de um mês novo, antes do mês anterior ainda ter sido congelado nenhuma vez).
+MES_ANTERIOR_ARQUIVO = _arq_anterior if os.path.exists(os.path.join(PUBLISH_DIR, _arq_anterior)) else None
+MES_ANTERIOR_ARQUIVO_OUTBOUND = _arq_anterior_ob if os.path.exists(os.path.join(PUBLISH_DIR, _arq_anterior_ob)) else None
+MES_ANTERIOR_LABEL = f'Ver {_MES_NOMES[_prev_mes].capitalize()} (fechado) →'
 
 dashboard_inbound = {
     **common,
@@ -590,6 +613,14 @@ def render(dashboard, out_name):
 
 render(dashboard_inbound, 'index.html')
 render(dashboard_outbound, 'outbound.html')
+
+# Snapshot do mês corrente (ver comentário acima, "ARQUIVAMENTO AUTOMÁTICO DE MÊS
+# FECHADO") — mesmo conteúdo do index.html/outbound.html, só troca o link de
+# navegação: em vez de apontar pro mês anterior, aponta de volta pro mês atual
+# (genérico, sem citar o mês por nome, pra não ficar desatualizado quando esse
+# arquivo congelar e passar a ser visto meses depois).
+render({**dashboard_inbound, 'mes_outro_url': 'index.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL)
+render({**dashboard_outbound, 'mes_outro_url': 'outbound.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL_OUTBOUND)
 
 ci = dashboard_inbound['consolidado']
 print(f"Inbound (Studio Fiscal) — CC1={ci['cc1_realizada']} | FPQ={ci['fpq_realizada']} | "

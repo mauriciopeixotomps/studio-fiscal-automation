@@ -45,8 +45,9 @@ git clone -q "https://x-access-token:${TOKEN}@github.com/$OWNER/$REPO.git" "$TMP
 cd "$TMP_REPO"
 cp "$PUBLISH/index.html" .
 cp "$PUBLISH/outbound.html" .
-# Páginas de meses arquivados (ex: julho-2026.html) — copia se existirem localmente,
-# uma vez publicadas ficam pra sempre no repo (build_dashboard.py não regenera).
+# Páginas de mês (ex: agosto-2026.html) — build_dashboard.py regenera a do mês
+# corrente a cada ciclo (fica "viva" até o mês virar) e nunca toca nas de meses
+# já passados, que ficam congeladas pra sempre no repo assim que o mês fecha.
 cp "$PUBLISH"/*-2026.html . 2>/dev/null || true
 
 # 4) Commit & push (só se houver mudanças)

@@ -530,12 +530,14 @@ _prev_ano = _cur_ano - 1 if _cur_mes == 1 else _cur_ano
 ARQUIVO_MES_ATUAL = _arquivo_mes(_cur_ano, _cur_mes)
 ARQUIVO_MES_ATUAL_OUTBOUND = _arquivo_mes(_cur_ano, _cur_mes, outbound=True)
 
-_arq_anterior = _arquivo_mes(_prev_ano, _prev_mes)
-_arq_anterior_ob = _arquivo_mes(_prev_ano, _prev_mes, outbound=True)
-# Só linka pro mês anterior se o arquivo já existir (evita link morto no primeiro
-# ciclo de um mês novo, antes do mês anterior ainda ter sido congelado nenhuma vez).
-MES_ANTERIOR_ARQUIVO = _arq_anterior if os.path.exists(os.path.join(PUBLISH_DIR, _arq_anterior)) else None
-MES_ANTERIOR_ARQUIVO_OUTBOUND = _arq_anterior_ob if os.path.exists(os.path.join(PUBLISH_DIR, _arq_anterior_ob)) else None
+# Calculado só por matemática de data (NÃO checa se o arquivo existe no disco local):
+# a automação roda tanto na nuvem (GitHub Actions, checkout novo a cada execução, sem
+# nenhum HTML antigo local) quanto no Mac (pasta publish/ persistente) — se o link
+# dependesse de os.path.exists() local, a nuvem sempre acharia que o mês anterior não
+# existe e ia sobrescrever o link correto que o Mac gerou, alternando entre os dois a
+# cada ciclo (foi exatamente o que causou o link "Ver Julho" sumir em 10/08/2026).
+MES_ANTERIOR_ARQUIVO = _arquivo_mes(_prev_ano, _prev_mes)
+MES_ANTERIOR_ARQUIVO_OUTBOUND = _arquivo_mes(_prev_ano, _prev_mes, outbound=True)
 MES_ANTERIOR_LABEL = f'Ver {_MES_NOMES[_prev_mes].capitalize()} (fechado) →'
 
 dashboard_inbound = {

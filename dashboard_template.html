@@ -463,7 +463,12 @@ const MONTH_DATES = (function() {
   }
   return out;
 })();
-const TODAY_ISO = new Date().toISOString().slice(0, 10);
+// Em página de mês já fechado (arquivada), a data real de hoje cai fora de
+// MONTH_DATES — sem esse fallback, os índices davam -1 e todo o card "Ritmo por
+// indicador" zerava ("Realizado hoje 0", "no ritmo") mesmo com os dados certos por
+// trás. Nesse caso trata "hoje" como o último dia do próprio mês (o total final).
+const _todayRaw = new Date().toISOString().slice(0, 10);
+const TODAY_ISO = MONTH_DATES.includes(_todayRaw) ? _todayRaw : MONTH_DATES[MONTH_DATES.length - 1];
 
 function cumulativeFromDaily(daily) {
   let cum = 0;

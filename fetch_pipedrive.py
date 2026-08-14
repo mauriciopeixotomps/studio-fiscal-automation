@@ -354,6 +354,10 @@ for d in p62_raw + p62_lost:
         'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
         'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
         'utm_criativo': d.get(config.CF_UTM_CONTENT),
+        # Sempre string (não deixar o pandas/Excel inferir número) — o campo é
+        # multi-select e vem como "97" ou "69,97"; se virasse float perderíamos a
+        # comparação exata (97 -> "97.0") e a etiqueta pra achar quem é Studio Fiscal.
+        'label': str(d.get('label')) if d.get('label') is not None else None,
     })
 df_p62 = pd.DataFrame(p62_rows)
 df_p62.to_excel(os.path.join(OUT_DIR, 'deals_pipeline62.xlsx'), index=False)

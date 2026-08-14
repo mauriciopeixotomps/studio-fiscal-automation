@@ -291,14 +291,35 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
     consolidado['leads_atribuidos_closers'] = consolidado['leads']
 
     if leads_mode == 'iniciados':
-        # "Negócios iniciados" no Ritmo/Metas usa a MESMA definição do Relatório por
-        # closer (só o que entrou na propriedade de um dos 4 closers — SDR/
-        # Qualificadora não conta), não o total do funil. consolidado['leads'] já é
-        # a soma dos closers (calculada acima), não sobrescreve.
+        # "Negócios iniciados" no Ritmo/Metas conta todo negócio do funil marcado pela
+        # Qualificadora com a etiqueta da equipe (config.LABEL_STUDIO_FISCAL — "Lead
+        # Studio Fiscal"), adicionado no mês, independente de já ter dono entre os 4
+        # closers ou ainda estar com a Qualificadora — é o volume real de geração de
+        # lead que a meta (ex: 1500) foi calibrada pra medir. Diferente do "Negócios
+        # iniciados" por closer no Relatório (CC1 realizada OU adicionado já com o
+        # closer como dono), que mede outra coisa (produtividade individual) e continua
+        # como estava.
+        def _tem_etiqueta(v):
+            # O Excel/pandas pode ler o campo como texto ("97") ou como número
+            # (97.0, quando toda a coluna só tem valores de etiqueta única) —
+            # normaliza os dois casos antes de comparar. Também cobre o formato
+            # multi-select original da API ("69,97").
+            if pd.isna(v):
+                return False
+            s = str(v)
+            if s.endswith('.0'):
+                s = s[:-2]
+            return config.LABEL_STUDIO_FISCAL in [p.strip() for p in s.split(',')]
+
         daily_leads = {}
-        for c in closers_out:
-            for day, count in c['diario']['leads'].items():
-                daily_leads[day] = daily_leads.get(day, 0) + count
+        if not deals_p.empty and 'label' in deals_p.columns:
+            d = deals_p.copy()
+            d['add_time'] = pd.to_datetime(d['add_time'], errors='coerce').dt.date
+            tem_etiqueta = d['label'].apply(_tem_etiqueta)
+            for day in d.loc[tem_etiqueta, 'add_time'].dropna():
+                if config.MONTH_START <= day <= config.MONTH_END:
+                    daily_leads[day.isoformat()] = daily_leads.get(day.isoformat(), 0) + 1
+        consolidado['leads'] = sum(daily_leads.values())
     else:
         daily_leads = daily_leads_funil
         consolidado['leads'] = consolidado['leads_funil']

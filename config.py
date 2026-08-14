@@ -103,6 +103,16 @@ CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'
 CF_UTM_CAMPAIGN = 'ee93fbc62c1804b82721486630058f3467651cec'
 CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
 
+# Etiqueta (campo "label" nativo do Pipedrive, multi-select) que a Qualificadora usa
+# pra marcar um negócio como sendo da Studio Fiscal — id 97 "Lead Studio Fiscal"
+# (conferido em 11/08/2026: 162 dos 170 negócios adicionados no funil 62 em agosto
+# tinham essa etiqueta; a "Studio Fiscal" sem "Lead" na frente, id 69, é usada 1x só,
+# não é essa). "Negócios iniciados" (Ritmo/Metas do mês) usa essa etiqueta pra contar
+# todo lead gerado pra Studio Fiscal no mês, independente de já ter dono entre os
+# closers (SDR/Qualificadora inclusos) — diferente do "Negócios iniciados" por closer
+# no Relatório, que continua sendo CC1 realizada OU adicionado já com o closer como dono.
+LABEL_STUDIO_FISCAL = '97'
+
 # ============= NEGÓCIOS EXCLUÍDOS =============
 # deal_id que aparece com um dos 4 closers como "owner" no Pipedrive, mas que o time
 # confirmou não ser fechamento real. Excluído de leads/contratos por closer e do

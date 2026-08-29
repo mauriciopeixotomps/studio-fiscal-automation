@@ -247,6 +247,67 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
         pd.DataFrame(all_futura[stage_key]).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_futura.xlsx'), index=False)
 pd.DataFrame(cc1_realizada_rows).to_excel(os.path.join(OUT_DIR, 'activities_cc1_realizada.xlsx'), index=False)
 
+# ============= AGENDADORES (leads recebidos / agendamentos / realizadas) =============
+# "Leads recebidos" = 1ª tentativa de contato criada pro agendador (due_date = quando
+# o lead caiu pra ele). "Agendamento" = CC1 marcada como agendada por ele (manual ou
+# bot), concluída (done) no mês. "Realizada" cruza o negocio_id do agendamento com os
+# CC1 Realizada já buscados acima (activities_cc1_realizada, cc1_realizada_rows) — a
+# CC1 em si fica na agenda do closer, não do agendador.
+print('-> Fetching atividades dos agendadores (leads recebidos / agendamentos)...')
+AGENDADOR_NOME = {a['id']: a['nome'] for a in config.AGENDADORES}
+
+
+def _fetch_agendador_activities(act_type, agendador_id):
+    rows = fetch_all('activities', {
+        'type': act_type,
+        'user_id': agendador_id,
+        'start_date': config.FETCH_START.isoformat(),
+        'end_date': config.FETCH_END.isoformat(),
+    })
+    return act_type, agendador_id, rows
+
+
+agendador_tasks = [
+    (act_type, aid)
+    for act_type in (config.ACT_TENTATIVA_1, config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)
+    for aid in config.AGENDADOR_IDS
+]
+agendador_raw = {act_type: [] for act_type in (config.ACT_TENTATIVA_1, config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)}
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    futures = [executor.submit(_fetch_agendador_activities, act_type, aid) for act_type, aid in agendador_tasks]
+    for f in concurrent.futures.as_completed(futures):
+        act_type, agendador_id, rows = f.result()
+        agendador_raw[act_type].extend(rows)
+        print(f'   {act_type} / {AGENDADOR_NOME.get(agendador_id)}: {len(rows)}')
+
+tentativa1_rows = []
+for a in agendador_raw[config.ACT_TENTATIVA_1]:
+    a = _correct_activity_tz(a)
+    due = a.get('due_date')
+    if due and _in_range(due, config.MONTH_START, config.MONTH_END):
+        tentativa1_rows.append({
+            'agendador_id': a.get('user_id'),
+            'agendador_nome': AGENDADOR_NOME.get(a.get('user_id')),
+            'negocio_id': a.get('deal_id'),
+            'due_date': due,
+        })
+pd.DataFrame(tentativa1_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_leads_recebidos.xlsx'), index=False)
+
+agendamento_rows = []
+for act_type in (config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT):
+    for a in agendador_raw[act_type]:
+        a = _correct_activity_tz(a)
+        if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END):
+            agendamento_rows.append({
+                'agendador_id': a.get('user_id'),
+                'agendador_nome': AGENDADOR_NOME.get(a.get('user_id')),
+                'negocio_id': a.get('deal_id'),
+                'tipo': act_type,
+                'marked_as_done_time': a.get('marked_as_done_time'),
+            })
+pd.DataFrame(agendamento_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_agendamentos.xlsx'), index=False)
+print(f'   leads recebidos (mês, todos agendadores): {len(tentativa1_rows)} | agendamentos concluídos: {len(agendamento_rows)}')
+
 # ============= DEALS (leads + contratos) =============
 print('-> Fetching deals por closer (proprietário)...')
 

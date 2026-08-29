@@ -278,6 +278,21 @@
     </div>
   </div>
 
+  <div class="card" id="card-agendadores" style="display:none;">
+    <h2>Time de agendamento <span class="hint">— % agendamento = agendamentos / leads recebidos; % realizada = CC1 realizada / agendamentos</span></h2>
+    <div style="overflow-x:auto">
+      <table id="agendadores-table">
+        <thead>
+          <tr>
+            <th>Agendador</th><th>Leads recebidos</th><th>Agendamentos</th><th>% agendamento</th>
+            <th>Realizadas</th><th>% realizada</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card" id="card-ritmo">
     <h2>Ritmo por indicador <span class="hint">— acumulado no mês vs. ritmo ideal (reta até a meta, dividida pelos dias úteis)</span></h2>
     <div class="pace-grid" id="pace-grid"></div>
@@ -1002,6 +1017,27 @@ document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? 
   previsaoTotalRowHtml('Total geral', D.previsao) +
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes)
 ) : '';
+
+// ===== Time de agendamento (SDRs dedicados) =====
+if (D.agendadores && D.agendadores.length) {
+  document.getElementById('card-agendadores').style.display = '';
+  function pctCell(v, meta) {
+    if (v === null || v === undefined) return '<td>—</td>';
+    const cls = v >= meta ? 'ahead' : 'behind';
+    const color = cls === 'ahead' ? 'var(--green)' : 'var(--orange)';
+    return `<td style="color:${color};font-weight:700">${v}% <span style="color:var(--text-dim);font-weight:400">/ meta ${meta}%</span></td>`;
+  }
+  document.querySelector('#agendadores-table tbody').innerHTML = D.agendadores.map(a => `
+    <tr>
+      <td>${a.nome}</td>
+      <td>${a.leads_recebidos}</td>
+      <td>${a.agendamentos}</td>
+      ${pctCell(a.pct_agendamento, D.agendadores_meta.meta_agendamento_pct)}
+      <td>${a.realizadas}</td>
+      ${pctCell(a.pct_realizada, D.agendadores_meta.meta_realizada_pct)}
+    </tr>
+  `).join('');
+}
 </script>
 </body>
 </html>

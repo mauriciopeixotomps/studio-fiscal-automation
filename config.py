@@ -58,11 +58,50 @@ CLOSERS = [
 ]
 CLOSER_IDS = [c['id'] for c in CLOSERS]
 
+# ============= AGENDADORES (equipe de agendamento, a partir de 11/08/2026) =============
+# SDRs dedicados a agendar CC1 só pro time da Studio Fiscal a partir de 11/08/2026
+# (antes atendiam vários times — ver histórico de chat). Não são closers: não têm
+# negócio como "dono" no sentido de fechamento, o painel só mostra a produtividade
+# deles (leads recebidos / agendamentos / realizadas).
+AGENDADORES = [
+    {
+        'id': 24196535,
+        'nome': 'Lorenzo Meneghetti',
+        'email': 'lorenzo.meneghetti@grupostudio.com.br',
+    },
+    {
+        'id': 24560514,
+        'nome': 'Jonatans Junior',
+        'email': 'jonatans.junior@grupostudio.com.br',
+    },
+    {
+        'id': 24165647,
+        'nome': 'Leonardo Soares',
+        'email': 'leonardo.soares@grupostudio.com.br',
+    },
+]
+AGENDADOR_IDS = [a['id'] for a in AGENDADORES]
+
+# Metas do time de agendamento (confirmado com o time, 11/08/2026):
+# - % agendamento = agendamentos / leads recebidos
+# - % realizada = CC1s realizadas / agendamentos
+META_AGENDAMENTO_PCT = 0.30
+META_AGENDADOR_REALIZADA_PCT = 0.65
+
 # ============= PIPEDRIVE: tipos de atividade =============
 ACT_CC1 = 'meeting'             # id 2  — CC1 Realizada (done=true) / CC1 Para Acontecer (done=false)
 ACT_FPQ = 'fpq_recebida'        # id 13 — FPQ Recebida
 ACT_CC2 = 'cc2_realizada1'      # id 10 — CC2 Realizada (done=true) / CC2 Para Acontecer (done=false)
 ACT_CC3 = 'cc3_realizada'       # id 32 — CC3 Realizada
+
+# Atividades do agendador: "Leads recebidos" = 1ª tentativa de contato criada pra ele
+# (task que nasce quando o lead é roteado pra ele); "Agendamento" = CC1 marcada como
+# agendada por ele (manual ou pelo bot) — a CC1 em si (config.ACT_CC1) fica na agenda
+# do CLOSER, não do agendador, então "Realizada" é calculada cruzando o negocio_id do
+# agendamento com os CC1 Realizada já buscados pros closers (ver build_dashboard.py).
+ACT_TENTATIVA_1 = '1o_tentativa_de_contato'
+ACT_AGENDAMENTO_CC1 = 'agendamento_de_cc1'
+ACT_AGENDAMENTO_CC1_BOT = 'agendamento_cc1___bot'
 
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 

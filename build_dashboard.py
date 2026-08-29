@@ -37,6 +37,8 @@ deals = load('deals.xlsx')
 deals_p62 = load('deals_pipeline62.xlsx')
 deals_p66 = load('deals_pipeline66.xlsx')
 previsao = load('previsao.xlsx')
+agendadores_leads = load('agendadores_leads_recebidos.xlsx')
+agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
 
 if not deals.empty:
     deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
@@ -145,6 +147,35 @@ scoreboard_previsto = {
     'contratos_previstos': len(previsao_out),
     'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_out),
     'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_out),
+}
+
+# ============= TIME DE AGENDAMENTO (SDRs dedicados à Studio Fiscal) =============
+# "Realizada" cruza o negócio do agendamento com os CC1 Realizada já buscados pros
+# closers (cc1_re) — a CC1 em si fica na agenda do closer, não do agendador.
+_cc1_realizado_deal_ids = set(cc1_re['negocio_id'].dropna()) if not cc1_re.empty and 'negocio_id' in cc1_re.columns else set()
+
+agendadores_out = []
+for a in config.AGENDADORES:
+    leads_n = 0
+    if not agendadores_leads.empty and 'agendador_nome' in agendadores_leads.columns:
+        leads_n = agendadores_leads.loc[agendadores_leads['agendador_nome'] == a['nome'], 'negocio_id'].nunique()
+    agendamento_deal_ids = set()
+    if not agendadores_agendamentos.empty and 'agendador_nome' in agendadores_agendamentos.columns:
+        agendamento_deal_ids = set(
+            agendadores_agendamentos.loc[agendadores_agendamentos['agendador_nome'] == a['nome'], 'negocio_id'].dropna()
+        )
+    realizadas_n = len(agendamento_deal_ids & _cc1_realizado_deal_ids)
+    agendadores_out.append({
+        'nome': a['nome'],
+        'leads_recebidos': int(leads_n),
+        'agendamentos': len(agendamento_deal_ids),
+        'realizadas': realizadas_n,
+        'pct_agendamento': pct(len(agendamento_deal_ids), leads_n),
+        'pct_realizada': pct(realizadas_n, len(agendamento_deal_ids)),
+    })
+agendadores_meta = {
+    'meta_agendamento_pct': round(config.META_AGENDAMENTO_PCT * 100),
+    'meta_realizada_pct': round(config.META_AGENDADOR_REALIZADA_PCT * 100),
 }
 
 
@@ -564,6 +595,8 @@ MES_ANTERIOR_LABEL = f'Ver {_MES_NOMES[_prev_mes].capitalize()} (fechado) →'
 dashboard_inbound = {
     **common,
     **inbound_data,
+    'agendadores': agendadores_out,
+    'agendadores_meta': agendadores_meta,
     'pagina_titulo': 'Equipe de Vendas — Studio Fiscal',
     'pagina_outra_url': 'outbound.html',
     'pagina_outra_label': 'Ver Outbound →',

@@ -242,11 +242,16 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         deals_p['closer_nome'] = deals_p['owner_id'].map(_closer_nome_por_id)
 
     # "Contrato enviado" contado pela etapa do negócio, não por atividade separada —
-    # só pega negócios que estão *atualmente* nessa etapa (stage_change_time = quando
-    # entrou).
+    # só pega negócios que estão *atualmente* nessa etapa E ainda em aberto
+    # (stage_change_time = quando entrou). Sem o status=='open', um negócio que
+    # passou por essa etapa e depois foi Ganho ou Perdido continuava contando pra
+    # sempre (o stage_id gravado não muda depois que o negócio fecha) — corrigido
+    # 29/08/2026.
     contrato_enviado_re = pd.DataFrame()
     if not deals_p.empty and 'stage_id' in deals_p.columns:
-        contrato_enviado_re = deals_p[deals_p['stage_id'].isin(stages_contrato_enviado)].copy()
+        contrato_enviado_re = deals_p[
+            deals_p['stage_id'].isin(stages_contrato_enviado) & (deals_p['status'] == 'open')
+        ].copy()
         contrato_enviado_re = contrato_enviado_re[contrato_enviado_re['closer_nome'].notna()]
 
     def negocios_iniciados_por_deal(nome):
@@ -749,6 +754,7 @@ dashboard_outbound = {
         ['contratos', 'Contratos fechados'],
         ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
         ['contratos_partner', 'Contratos Partner (grátis)'],
+        ['no_show', 'No-show'],
     ],
 }
 dashboard_rebarba = {
@@ -775,6 +781,7 @@ dashboard_rebarba = {
         ['cc3_futura', 'CC3 a acontecer'],
         ['contrato_enviado', 'Contrato enviado'],
         ['contratos', 'Contratos fechados'],
+        ['no_show', 'No-show'],
     ],
 }
 

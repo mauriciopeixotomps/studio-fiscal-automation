@@ -294,18 +294,6 @@
     </div>
   </div>
 
-  <div class="card" id="card-no-show-closers" style="display:none;">
-    <h2>No-show por closer <span class="hint">— % no-show = no-show / (CC1 realizada + no-show) no mês</span></h2>
-    <div style="overflow-x:auto">
-      <table id="no-show-closers-table">
-        <thead>
-          <tr><th>Closer</th><th>CC1 realizada</th><th>No-show</th><th>% no-show</th></tr>
-        </thead>
-        <tbody></tbody>
-      </table>
-    </div>
-  </div>
-
   <div class="card" id="card-ritmo">
     <h2>Ritmo por indicador <span class="hint">— acumulado no mês vs. ritmo ideal (reta até a meta, dividida pelos dias úteis)</span></h2>
     <div class="pace-grid" id="pace-grid"></div>
@@ -371,6 +359,9 @@
         <label for="relatorio-sort-key">Ordenar por</label>
         <select id="relatorio-sort-key"></select>
         <button id="relatorio-sort-dir" class="rtab" data-dir="desc" title="Ordem">↓ maior → menor</button>
+      </div>
+      <div class="relatorio-sort">
+        <button id="relatorio-export" class="rtab" title="Baixa em CSV exatamente o que está sendo exibido agora (período e dia selecionados)">⬇ Exportar CSV</button>
       </div>
     </div>
     <div id="relatorio-closers"></div>
@@ -942,6 +933,41 @@ document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(btn => {
   });
 });
 
+// ===== Exportar CSV — exatamente o que está na tela agora (período/dia/ordem) =====
+function csvEscape(v) {
+  const s = String(v ?? '');
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+function tableToCsvRows(table, closerLabel) {
+  const rows = [];
+  table.querySelectorAll('tr').forEach(tr => {
+    const cells = Array.from(tr.querySelectorAll('th,td')).map(td => td.textContent.trim());
+    if (cells.length) rows.push([closerLabel, ...cells].map(csvEscape).join(','));
+  });
+  return rows;
+}
+document.getElementById('relatorio-export').addEventListener('click', () => {
+  const header = ['Closer', 'Período', ...RELATORIO_METRICS.map(([, label]) => label)].map(csvEscape).join(',');
+  const lines = [header];
+  relatorioOrder.forEach((c, i) => {
+    const table = document.querySelector(`#relatorio-table-${i} table`);
+    if (table) lines.push(...tableToCsvRows(table, c.nome).slice(1)); // slice(1): pula o cabeçalho repetido
+  });
+  const teamTable = document.querySelector('#relatorio-table-team table');
+  if (teamTable) lines.push(...tableToCsvRows(teamTable, 'Total da equipe').slice(1));
+  const csv = '﻿' + lines.join('\n'); // BOM pra acentuação abrir certo no Excel
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const periodoLbl = relatorioPeriod === 'mes' ? 'mes' : (relatorioPeriod === 'semanal' ? 'semanal' : (relatorioDataInput.value || 'diario'));
+  a.href = url;
+  a.download = `relatorio_${D.pagina_titulo.replace(/[^a-zA-Z0-9]+/g, '_')}_${periodoLbl}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+});
+
 // ===== Previsão =====
 function confiancaCategoria(v) {
   if (!v) return null;
@@ -1057,18 +1083,6 @@ if (D.agendadores && D.agendadores.length) {
   }).join('');
 }
 
-// ===== No-show por closer =====
-if (D.closers && D.closers.length) {
-  document.getElementById('card-no-show-closers').style.display = '';
-  document.querySelector('#no-show-closers-table tbody').innerHTML = D.closers.map(c => `
-    <tr>
-      <td>${c.nome}</td>
-      <td>${c.cc1_realizada}</td>
-      <td>${c.no_show}</td>
-      <td>${c.pct_no_show === null ? '—' : c.pct_no_show + '%'}</td>
-    </tr>
-  `).join('');
-}
 </script>
 </body>
 </html>

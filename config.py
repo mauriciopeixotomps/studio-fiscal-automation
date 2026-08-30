@@ -140,6 +140,23 @@ PIPELINE_STAGE_CONTRATO_ENVIADO = 603
 # lógica, offset consistente de +92 confirmado nas 7 últimas etapas dos dois funis.
 PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND = 695
 
+# ============= NOVOS FUNIS (confirmado com o time, 29/08/2026) =============
+# "REBARBA STUDIO FISCAL FRANQUIA" — reativação de negócios perdidos do funil 62
+# (etapas: PERDIDO -> REATIVAÇÃO -> EM ATENDIMENTO -> REUNIÃO AGENDADA -> AGUARDANDO
+# FPQ -> ... -> CONTRATO ENVIADO, de "REUNIÃO AGENDADA" em diante é o mesmo desenho
+# do 62). Página própria (publish/rebarba.html), como o Outbound: ainda sem meta, só
+# produtividade (CC1/FPQ/CC2/CC3/Contrato enviado/Contratos).
+PIPELINE_REBARBA_STUDIO_FISCAL = 65
+PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA = 633
+
+# "OUTBOUND - EVENTOS" — outro motor de outbound (convite/parceria em eventos), sem
+# etiqueta de marca nenhuma (diferente do 62/65, que usam LABEL_STUDIO_FISCAL) — o
+# time confirmou que esse pipeline é 100% da Fiscal, conta tudo sem filtrar por dono
+# nem etiqueta. Reportado JUNTO com o Outbound (mesma página, publish/outbound.html)
+# — pro time ele é "outbound", não um funil separado.
+PIPELINE_OUTBOUND_EVENTOS = 69
+PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS = 721
+
 # Domínio Pipedrive da conta — usado pra montar link direto pro negócio (ex: nas FPQs recebidas)
 PIPEDRIVE_DOMAIN = 'grupostudioexp.pipedrive.com'
 

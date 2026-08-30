@@ -219,7 +219,7 @@
     </div>
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <a class="page-nav-link" id="month-nav-link" href="#" style="display:none;"></a>
-      <a class="page-nav-link" id="page-nav-link" href="#"></a>
+      <div id="paginas-irmas-nav" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
     </div>
   </header>
 
@@ -439,17 +439,13 @@ function pctStr(v) { return (v === null || v === undefined) ? '—' : v + '%'; }
 document.getElementById('subtitle').textContent =
   `${D.mes_label} · ${fmtDate(D.periodo_inicio)} a ${fmtDate(D.periodo_fim)} · atualizado em ${D.gerado_em.replace('T',' ')}`;
 
-// ===== Página (Inbound x Outbound) =====
+// ===== Página (Inbound x Outbound x Rebarba...) =====
 document.getElementById('page-h1').textContent = D.pagina_titulo;
 document.getElementById('perdidos-hint').textContent = D.perdidos_hint;
 document.getElementById('relatorio-hint').textContent = D.relatorio_hint;
-const pageNav = document.getElementById('page-nav-link');
-if (D.pagina_outra_url) {
-  pageNav.href = D.pagina_outra_url;
-  pageNav.textContent = D.pagina_outra_label;
-} else {
-  pageNav.style.display = 'none';
-}
+document.getElementById('paginas-irmas-nav').innerHTML = (D.paginas_irmas || []).map(p =>
+  `<a class="page-nav-link" href="${p.url}">${p.label} →</a>`
+).join('');
 if (D.mes_outro_url) {
   const monthNav = document.getElementById('month-nav-link');
   monthNav.href = D.mes_outro_url;

@@ -498,4 +498,44 @@ n_p66_leads_closers = (
 ).sum() if len(df_p66) else 0
 print(f'   negócios no funil outbound (todos, {len(df_p66)}) | criados no mês: {n_p66_leads} | criados no mês já com um closer como dono: {n_p66_leads_closers}')
 
+
+def _fetch_pipeline_deals(pipeline_id, nome_log):
+    """Mesma lógica de p62/p66: busca todo negócio do pipeline (aberto via endpoint
+    próprio, perdido via lost_rows_all já buscado) e devolve as linhas no formato
+    padrão usado pelas páginas do dashboard."""
+    print(f'-> Fetching negócios do funil {nome_log} (pipeline {pipeline_id}, todos)...')
+    raw = fetch_all(f'pipelines/{pipeline_id}/deals', {'status': 'all_not_deleted'})
+    lost = [d for d in lost_rows_all if d.get('pipeline_id') == pipeline_id]
+    print(f'   perdidos no funil {pipeline_id} (dentre os já buscados no mês): {len(lost)}')
+    rows = []
+    for d in raw + lost:
+        owner = d.get('user_id') or {}
+        rows.append({
+            'deal_id': d.get('id'),
+            'titulo': d.get('title'),
+            'stage_id': d.get('stage_id'),
+            'stage_change_time': _fix_dt(d.get('stage_change_time')),
+            'status': d.get('status'),
+            'add_time': _fix_dt(d.get('add_time')),
+            'lost_time': _fix_dt(d.get('lost_time')),
+            'lost_reason': d.get('lost_reason'),
+            'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
+            'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
+            'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
+            'utm_criativo': d.get(config.CF_UTM_CONTENT),
+            'label': str(d.get('label')) if d.get('label') is not None else None,
+        })
+    df = pd.DataFrame(rows)
+    df.to_excel(os.path.join(OUT_DIR, f'deals_pipeline{pipeline_id}.xlsx'), index=False)
+    n_leads = df['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df) else 0
+    print(f'   negócios no funil (todos, {len(df)}) | criados no mês: {n_leads}')
+    return df
+
+
+# ============= REBARBA STUDIO FISCAL FRANQUIA (pipeline 65) — reativação de perdidos =============
+df_p65 = _fetch_pipeline_deals(config.PIPELINE_REBARBA_STUDIO_FISCAL, 'REBARBA STUDIO FISCAL FRANQUIA')
+
+# ============= OUTBOUND - EVENTOS (pipeline 69) — reportado junto com o Outbound =============
+df_p69 = _fetch_pipeline_deals(config.PIPELINE_OUTBOUND_EVENTOS, 'OUTBOUND - EVENTOS')
+
 print(f'\nDados salvos em {OUT_DIR}/')

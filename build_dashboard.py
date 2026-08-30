@@ -37,6 +37,8 @@ fpq_re = load('activities_fpq_realizada.xlsx')
 deals = load('deals.xlsx')
 deals_p62 = load('deals_pipeline62.xlsx')
 deals_p66 = load('deals_pipeline66.xlsx')
+deals_p65 = load('deals_pipeline65.xlsx')  # REBARBA STUDIO FISCAL FRANQUIA
+deals_p69 = load('deals_pipeline69.xlsx')  # OUTBOUND - EVENTOS (reportado junto com o 66)
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
 agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
@@ -48,6 +50,10 @@ if not deals_p62.empty:
     deals_p62 = deals_p62[~deals_p62['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not deals_p66.empty:
     deals_p66 = deals_p66[~deals_p66['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+if not deals_p65.empty:
+    deals_p65 = deals_p65[~deals_p65['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+if not deals_p69.empty:
+    deals_p69 = deals_p69[~deals_p69['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not previsao.empty:
     previsao = previsao[~previsao['deal_id'].isin(config.PREVISAO_EXCLUIDOS)]
 
@@ -197,10 +203,13 @@ agendadores_meta = {
 }
 
 
-def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta):
-    """Monta o dict de dados de UMA página (inbound ou outbound), filtrando CC1/CC2/
-    CC3/FPQ pelo pipeline_id do negócio vinculado — pra não misturar atividade de um
-    funil no número do outro.
+def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta):
+    """Monta o dict de dados de UMA página (inbound, outbound, rebarba...), filtrando
+    CC1/CC2/CC3/FPQ pelo pipeline_id do negócio vinculado — pra não misturar atividade
+    de um funil no número do outro. pipeline_ids é uma lista pra dar pra juntar mais de
+    um pipeline numa mesma página (ex: Outbound = funil próprio + Eventos, ver chamada
+    mais abaixo); stages_contrato_enviado é a lista das etapas "CONTRATO ENVIADO"
+    correspondentes (uma por pipeline, IDs diferentes em cada um).
 
     leads_mode:
       'cc1'    — "Leads" conta negócios distintos que o closer levou a CC1 realizada
@@ -211,7 +220,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
     def pf(df):
         if df.empty or 'pipeline_id' not in df.columns:
             return df.iloc[0:0]
-        return df[df['pipeline_id'] == pipeline_id]
+        return df[df['pipeline_id'].isin(pipeline_ids)]
 
     cc1_p, cc1_fut_p = pf(cc1_re), pf(cc1_fut)
     cc2_p, cc2_fut_p = pf(cc2_re), pf(cc2_fut)
@@ -219,7 +228,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
     fpq_p = pf(fpq_re)
     no_show_p = pf(no_show_re)
     deals_pipe = (
-        deals[deals['pipeline_id'] == pipeline_id].copy()
+        deals[deals['pipeline_id'].isin(pipeline_ids)].copy()
         if not deals.empty and 'pipeline_id' in deals.columns else deals.iloc[0:0]
     )
 
@@ -232,7 +241,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
     # entrou).
     contrato_enviado_re = pd.DataFrame()
     if not deals_p.empty and 'stage_id' in deals_p.columns:
-        contrato_enviado_re = deals_p[deals_p['stage_id'] == stage_contrato_enviado].copy()
+        contrato_enviado_re = deals_p[deals_p['stage_id'].isin(stages_contrato_enviado)].copy()
         contrato_enviado_re = contrato_enviado_re[contrato_enviado_re['closer_nome'].notna()]
 
     def negocios_iniciados_por_deal(nome):
@@ -564,18 +573,32 @@ common = {
 }
 
 inbound_data = build_page(
-    pipeline_id=config.PIPELINE_STUDIO_FISCAL_FRANQUIA,
+    pipeline_ids=[config.PIPELINE_STUDIO_FISCAL_FRANQUIA],
     deals_p=deals_p62,
-    stage_contrato_enviado=config.PIPELINE_STAGE_CONTRATO_ENVIADO,
+    stages_contrato_enviado=[config.PIPELINE_STAGE_CONTRATO_ENVIADO],
     leads_mode='iniciados',
     meta_leads=metas.get('meta_leads'),
     meta_contratos_val=metas['meta_contratos'],
     tem_meta=True,
 )
+# Outbound = funil próprio (66) + Eventos (69) juntos numa página só, a pedido do
+# time (29/08/2026) — "Eventos" não tem etiqueta de marca nenhuma e é 100% Fiscal,
+# não precisa filtrar por dono.
+deals_p_outbound = pd.concat([deals_p66, deals_p69], ignore_index=True) if not deals_p66.empty or not deals_p69.empty else deals_p66
 outbound_data = build_page(
-    pipeline_id=config.PIPELINE_OUTBOUND_STUDIO_FISCAL,
-    deals_p=deals_p66,
-    stage_contrato_enviado=config.PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND,
+    pipeline_ids=[config.PIPELINE_OUTBOUND_STUDIO_FISCAL, config.PIPELINE_OUTBOUND_EVENTOS],
+    deals_p=deals_p_outbound,
+    stages_contrato_enviado=[config.PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND, config.PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS],
+    leads_mode='criado',
+    meta_leads=None,
+    meta_contratos_val=None,
+    tem_meta=False,
+)
+# Rebarba (65) — reativação de perdidos, página própria, ainda sem meta (29/08/2026).
+rebarba_data = build_page(
+    pipeline_ids=[config.PIPELINE_REBARBA_STUDIO_FISCAL],
+    deals_p=deals_p65,
+    stages_contrato_enviado=[config.PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA],
     leads_mode='criado',
     meta_leads=None,
     meta_contratos_val=None,
@@ -596,9 +619,9 @@ _MES_NOMES = {1: 'janeiro', 2: 'fevereiro', 3: 'março', 4: 'abril', 5: 'maio', 
               7: 'julho', 8: 'agosto', 9: 'setembro', 10: 'outubro', 11: 'novembro', 12: 'dezembro'}
 
 
-def _arquivo_mes(ano, mes, outbound=False):
+def _arquivo_mes(ano, mes, prefixo=None):
     nome = _MES_NOMES[mes]
-    return f'outbound-{nome}-{ano}.html' if outbound else f'{nome}-{ano}.html'
+    return f'{prefixo}-{nome}-{ano}.html' if prefixo else f'{nome}-{ano}.html'
 
 
 _cur_ano, _cur_mes = config.MONTH_START.year, config.MONTH_START.month
@@ -606,7 +629,8 @@ _prev_mes = 12 if _cur_mes == 1 else _cur_mes - 1
 _prev_ano = _cur_ano - 1 if _cur_mes == 1 else _cur_ano
 
 ARQUIVO_MES_ATUAL = _arquivo_mes(_cur_ano, _cur_mes)
-ARQUIVO_MES_ATUAL_OUTBOUND = _arquivo_mes(_cur_ano, _cur_mes, outbound=True)
+ARQUIVO_MES_ATUAL_OUTBOUND = _arquivo_mes(_cur_ano, _cur_mes, prefixo='outbound')
+ARQUIVO_MES_ATUAL_REBARBA = _arquivo_mes(_cur_ano, _cur_mes, prefixo='rebarba')
 
 # Calculado só por matemática de data (NÃO checa se o arquivo existe no disco local):
 # a automação roda tanto na nuvem (GitHub Actions, checkout novo a cada execução, sem
@@ -615,8 +639,20 @@ ARQUIVO_MES_ATUAL_OUTBOUND = _arquivo_mes(_cur_ano, _cur_mes, outbound=True)
 # existe e ia sobrescrever o link correto que o Mac gerou, alternando entre os dois a
 # cada ciclo (foi exatamente o que causou o link "Ver Julho" sumir em 10/08/2026).
 MES_ANTERIOR_ARQUIVO = _arquivo_mes(_prev_ano, _prev_mes)
-MES_ANTERIOR_ARQUIVO_OUTBOUND = _arquivo_mes(_prev_ano, _prev_mes, outbound=True)
+MES_ANTERIOR_ARQUIVO_OUTBOUND = _arquivo_mes(_prev_ano, _prev_mes, prefixo='outbound')
+MES_ANTERIOR_ARQUIVO_REBARBA = _arquivo_mes(_prev_ano, _prev_mes, prefixo='rebarba')
 MES_ANTERIOR_LABEL = f'Ver {_MES_NOMES[_prev_mes].capitalize()} (fechado) →'
+
+PAGINAS_IRMAS = {
+    'inbound': {'url': 'index.html', 'label': 'Studio Fiscal (Inbound)'},
+    'outbound': {'url': 'outbound.html', 'label': 'Outbound'},
+    'rebarba': {'url': 'rebarba.html', 'label': 'Rebarba (reativação)'},
+}
+
+
+def _paginas_irmas(exceto):
+    return [v for k, v in PAGINAS_IRMAS.items() if k != exceto]
+
 
 dashboard_inbound = {
     **common,
@@ -624,8 +660,7 @@ dashboard_inbound = {
     'agendadores': agendadores_out,
     'agendadores_meta': agendadores_meta,
     'pagina_titulo': 'Equipe de Vendas — Studio Fiscal',
-    'pagina_outra_url': 'outbound.html',
-    'pagina_outra_label': 'Ver Outbound →',
+    'paginas_irmas': _paginas_irmas('inbound'),
     'mes_outro_url': MES_ANTERIOR_ARQUIVO,
     'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
@@ -652,17 +687,43 @@ dashboard_outbound = {
     **common,
     **outbound_data,
     'pagina_titulo': 'Equipe de Vendas — Outbound',
-    'pagina_outra_url': 'index.html',
-    'pagina_outra_label': '← Ver Studio Fiscal (Inbound)',
+    'paginas_irmas': _paginas_irmas('outbound'),
     'mes_outro_url': MES_ANTERIOR_ARQUIVO_OUTBOUND,
     'mes_outro_label': MES_ANTERIOR_LABEL,
-    'perdidos_hint': '— negócios perdidos no funil Outbound Studio Fiscal no mês',
+    'perdidos_hint': '— negócios perdidos nos funis Outbound + Eventos da Studio Fiscal no mês',
     'relatorio_hint': (
-        '— diário, semanal e consolidado do mês. "Leads" conta negócios do funil '
-        'Outbound criados no mês já com um closer como dono'
+        '— diário, semanal e consolidado do mês. Junta o funil Outbound próprio (66) '
+        'com o Outbound - Eventos (69). "Leads" conta negócios criados no mês já com '
+        'um closer como dono'
     ),
     # Aqui "Leads" continua — ainda não tem CC1 nesse funil, então é a única
     # métrica de produtividade disponível por enquanto.
+    'relatorio_metrics': [
+        ['leads', 'Leads'],
+        ['cc1_realizada', 'CC1 realizada'],
+        ['cc1_futura', 'CC1 a acontecer'],
+        ['fpq_realizada', 'FPQ recebida'],
+        ['cc2_realizada', 'CC2 realizada'],
+        ['cc2_futura', 'CC2 a acontecer'],
+        ['cc3_realizada', 'CC3 realizada'],
+        ['cc3_futura', 'CC3 a acontecer'],
+        ['contrato_enviado', 'Contrato enviado'],
+        ['contratos', 'Contratos fechados'],
+    ],
+}
+dashboard_rebarba = {
+    **common,
+    **rebarba_data,
+    'pagina_titulo': 'Equipe de Vendas — Rebarba (reativação)',
+    'paginas_irmas': _paginas_irmas('rebarba'),
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO_REBARBA,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
+    'perdidos_hint': '— negócios perdidos no funil Rebarba Studio Fiscal Franquia no mês',
+    'relatorio_hint': (
+        '— diário, semanal e consolidado do mês. Reativação de negócios perdidos do '
+        'funil Studio Fiscal Franquia. "Leads" conta negócios criados no mês já com '
+        'um closer como dono'
+    ),
     'relatorio_metrics': [
         ['leads', 'Leads'],
         ['cc1_realizada', 'CC1 realizada'],
@@ -696,14 +757,16 @@ def render(dashboard, out_name):
 
 render(dashboard_inbound, 'index.html')
 render(dashboard_outbound, 'outbound.html')
+render(dashboard_rebarba, 'rebarba.html')
 
 # Snapshot do mês corrente (ver comentário acima, "ARQUIVAMENTO AUTOMÁTICO DE MÊS
-# FECHADO") — mesmo conteúdo do index.html/outbound.html, só troca o link de
-# navegação: em vez de apontar pro mês anterior, aponta de volta pro mês atual
-# (genérico, sem citar o mês por nome, pra não ficar desatualizado quando esse
+# FECHADO") — mesmo conteúdo do index.html/outbound.html/rebarba.html, só troca o
+# link de navegação: em vez de apontar pro mês anterior, aponta de volta pro mês
+# atual (genérico, sem citar o mês por nome, pra não ficar desatualizado quando esse
 # arquivo congelar e passar a ser visto meses depois).
 render({**dashboard_inbound, 'mes_outro_url': 'index.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL)
 render({**dashboard_outbound, 'mes_outro_url': 'outbound.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL_OUTBOUND)
+render({**dashboard_rebarba, 'mes_outro_url': 'rebarba.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL_REBARBA)
 
 ci = dashboard_inbound['consolidado']
 print(f"Inbound (Studio Fiscal) — CC1={ci['cc1_realizada']} | FPQ={ci['fpq_realizada']} | "

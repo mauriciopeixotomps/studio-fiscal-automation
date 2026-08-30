@@ -201,6 +201,42 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
         all_futura[stage_key] = futura
         print(f'   {stage_key} para acontecer: {len(futura)}')
 
+# ============= NO-SHOW (tarefa do CLOSER — ver config.py) =============
+print('-> Fetching no-show (imprevisto/desinteresse) por closer...')
+
+
+def _fetch_no_show(act_type, closer_id):
+    rows = fetch_all('activities', {
+        'type': act_type,
+        'user_id': closer_id,
+        'start_date': config.FETCH_START.isoformat(),
+        'end_date': config.FETCH_END.isoformat(),
+    })
+    return act_type, closer_id, rows
+
+
+no_show_tasks = [
+    (act_type, cid)
+    for act_type in (config.ACT_NO_SHOW_IMPREVISTO, config.ACT_NO_SHOW_DESINTERESSE)
+    for cid in config.CLOSER_IDS
+]
+no_show_raw = {act_type: [] for act_type in (config.ACT_NO_SHOW_IMPREVISTO, config.ACT_NO_SHOW_DESINTERESSE)}
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    futures = [executor.submit(_fetch_no_show, act_type, cid) for act_type, cid in no_show_tasks]
+    for f in concurrent.futures.as_completed(futures):
+        act_type, closer_id, rows = f.result()
+        no_show_raw[act_type].extend(rows)
+
+no_show_rows = []
+for act_type, rows in no_show_raw.items():
+    for a in rows:
+        a = _correct_activity_tz(a)
+        if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END):
+            row = act_row(a)
+            row['tipo'] = act_type
+            no_show_rows.append(row)
+print(f'   no-show no mês (todos closers): {len(no_show_rows)}')
+
 # ============= PIPELINE (e UTM da CC1) do negócio vinculado =============
 # Enriquece TODA atividade (CC1/CC2/CC3/FPQ, realizada e futura) com o pipeline_id
 # do negócio vinculado — pra dar pra separar Studio Fiscal (62) de Outbound (66)
@@ -224,7 +260,7 @@ def _fetch_deal_utm(deal_id):
     return deal_id, None, None, None
 
 
-all_rows = [r for rows in all_realizada.values() for r in rows] + [r for rows in all_futura.values() for r in rows]
+all_rows = [r for rows in all_realizada.values() for r in rows] + [r for rows in all_futura.values() for r in rows] + no_show_rows
 unique_deal_ids = sorted({r['negocio_id'] for r in all_rows if r.get('negocio_id')})
 utm_by_deal = {}
 if unique_deal_ids:
@@ -246,6 +282,7 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
     if tem_futura:
         pd.DataFrame(all_futura[stage_key]).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_futura.xlsx'), index=False)
 pd.DataFrame(cc1_realizada_rows).to_excel(os.path.join(OUT_DIR, 'activities_cc1_realizada.xlsx'), index=False)
+pd.DataFrame(no_show_rows).to_excel(os.path.join(OUT_DIR, 'activities_no_show.xlsx'), index=False)
 
 # ============= AGENDADORES (leads recebidos / agendamentos / realizadas) =============
 # "Leads recebidos" = 1ª tentativa de contato criada pro agendador (due_date = quando

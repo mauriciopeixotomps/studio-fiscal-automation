@@ -103,6 +103,14 @@ ACT_TENTATIVA_1 = '1o_tentativa_de_contato'
 ACT_AGENDAMENTO_CC1 = 'agendamento_de_cc1'
 ACT_AGENDAMENTO_CC1_BOT = 'agendamento_cc1___bot'
 
+# No-show: o time passou a usar essas duas tarefas a partir de 29/08/2026 (antes,
+# 0 registros em toda a conta). O "responsável" (user_id) da tarefa é o CLOSER, não
+# o agendador — assim dá pra ver de quem foi o no-show pelo lado do closer (dono da
+# tarefa) e, cruzando o negocio_id com os agendamentos, também de qual agendador
+# (ver build_dashboard.py — mesmo cruzamento já usado pra achar "Realizada").
+ACT_NO_SHOW_IMPREVISTO = 'no_show_imprevisto'
+ACT_NO_SHOW_DESINTERESSE = 'no_show_desinteresse'
+
 PIPELINE_STUDIO_FISCAL_FRANQUIA = 62
 
 # Funil novo de outbound (pipeline própria, dashboard separado — ver publish/outbound.html)

@@ -8,6 +8,7 @@ dois funis (CC1/FPQ/CC2/CC3/Contrato enviado/Contratos de um não conta no outro
 import base64, json, os
 from collections import Counter
 from datetime import date, timedelta
+from math import ceil
 from zoneinfo import ZoneInfo
 import pandas as pd
 
@@ -39,6 +40,7 @@ deals_p66 = load('deals_pipeline66.xlsx')
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
 agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
+no_show_re = load('activities_no_show.xlsx')
 
 if not deals.empty:
     deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
@@ -150,9 +152,14 @@ scoreboard_previsto = {
 }
 
 # ============= TIME DE AGENDAMENTO (SDRs dedicados à Studio Fiscal) =============
-# "Realizada" cruza o negócio do agendamento com os CC1 Realizada já buscados pros
-# closers (cc1_re) — a CC1 em si fica na agenda do closer, não do agendador.
-_cc1_realizado_deal_ids = set(cc1_re['negocio_id'].dropna()) if not cc1_re.empty and 'negocio_id' in cc1_re.columns else set()
+# "Realizada"/"No-show" cruzam o negócio do agendamento com os CC1 Realizada e os
+# no-show já buscados pros closers (cc1_re / no_show_re) — a CC1 em si (e o no-show
+# dela) ficam na agenda do closer, não do agendador. Restrito ao pipeline 62 (funil
+# Studio Fiscal) — é o único que os agendadores atendem.
+_cc1_re_p62 = cc1_re[cc1_re['pipeline_id'] == config.PIPELINE_STUDIO_FISCAL_FRANQUIA] if not cc1_re.empty and 'pipeline_id' in cc1_re.columns else cc1_re
+_no_show_p62 = no_show_re[no_show_re['pipeline_id'] == config.PIPELINE_STUDIO_FISCAL_FRANQUIA] if not no_show_re.empty and 'pipeline_id' in no_show_re.columns else no_show_re
+_cc1_realizado_deal_ids = set(_cc1_re_p62['negocio_id'].dropna()) if not _cc1_re_p62.empty and 'negocio_id' in _cc1_re_p62.columns else set()
+_no_show_deal_ids = set(_no_show_p62['negocio_id'].dropna()) if not _no_show_p62.empty and 'negocio_id' in _no_show_p62.columns else set()
 
 agendadores_out = []
 for a in config.AGENDADORES:
@@ -164,14 +171,25 @@ for a in config.AGENDADORES:
         agendamento_deal_ids = set(
             agendadores_agendamentos.loc[agendadores_agendamentos['agendador_nome'] == a['nome'], 'negocio_id'].dropna()
         )
+    n_agendamentos = len(agendamento_deal_ids)
     realizadas_n = len(agendamento_deal_ids & _cc1_realizado_deal_ids)
+    no_show_n = len(agendamento_deal_ids & _no_show_deal_ids)
+    meta_agendamentos = leads_n * config.META_AGENDAMENTO_PCT
+    meta_realizadas = n_agendamentos * config.META_AGENDADOR_REALIZADA_PCT
     agendadores_out.append({
         'nome': a['nome'],
         'leads_recebidos': int(leads_n),
-        'agendamentos': len(agendamento_deal_ids),
+        'agendamentos': n_agendamentos,
         'realizadas': realizadas_n,
-        'pct_agendamento': pct(len(agendamento_deal_ids), leads_n),
-        'pct_realizada': pct(realizadas_n, len(agendamento_deal_ids)),
+        'no_show': no_show_n,
+        'pct_agendamento': pct(n_agendamentos, leads_n),
+        'pct_realizada': pct(realizadas_n, n_agendamentos),
+        'pct_no_show': pct(no_show_n, n_agendamentos),
+        # Quanto falta pra bater a própria meta: agendamentos até chegar em 30% dos
+        # leads recebidos, e realizadas até chegar em 65% dos agendamentos já feitos
+        # (não recalcula com agendamentos hipotéticos futuros).
+        'faltam_agendamentos': max(0, ceil(meta_agendamentos - n_agendamentos)),
+        'faltam_realizadas': max(0, ceil(meta_realizadas - realizadas_n)),
     })
 agendadores_meta = {
     'meta_agendamento_pct': round(config.META_AGENDAMENTO_PCT * 100),
@@ -199,6 +217,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
     cc2_p, cc2_fut_p = pf(cc2_re), pf(cc2_fut)
     cc3_p, cc3_fut_p = pf(cc3_re), pf(cc3_fut)
     fpq_p = pf(fpq_re)
+    no_show_p = pf(no_show_re)
     deals_pipe = (
         deals[deals['pipeline_id'] == pipeline_id].copy()
         if not deals.empty and 'pipeline_id' in deals.columns else deals.iloc[0:0]
@@ -265,12 +284,16 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
             'contrato_enviado': count_by_closer(contrato_enviado_re, nome),
             'leads': leads_count(nome),
             'contratos': sum(per_closer_daily(deals_pipe, 'won_time', nome, status='won').values()),
+            'no_show': count_by_closer(no_show_p, nome),
         }
         m['conversao'] = {
             'cc1_para_fpq': pct(m['fpq_realizada'], m['cc1_realizada']),
             'fpq_para_cc2': pct(m['cc2_realizada'], m['fpq_realizada']),
             'cc2_para_cc3': pct(m['cc3_realizada'], m['cc2_realizada']),
         }
+        # % no-show = do total de CC1 que deveriam acontecer (realizada + no-show),
+        # quantas viraram no-show — não usa cc1_futura (essas ainda não aconteceram).
+        m['pct_no_show'] = pct(m['no_show'], m['cc1_realizada'] + m['no_show'])
         return m
 
     closers_out = []
@@ -287,6 +310,7 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
             'cc3_futura': per_closer_daily(cc3_fut_p, 'due_date', c['nome']),
             'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
             'contratos': per_closer_daily(deals_pipe, 'won_time', c['nome'], status='won'),
+            'no_show': per_closer_daily(no_show_p, 'marked_as_done_time', c['nome']),
         }
         closers_out.append({'nome': c['nome'], 'foto': c['foto'], **metrics, 'diario': diario})
 
@@ -301,12 +325,14 @@ def build_page(*, pipeline_id, deals_p, stage_contrato_enviado, leads_mode, meta
         'contrato_enviado': sum(c['contrato_enviado'] for c in closers_out),
         'leads': sum(c['leads'] for c in closers_out),  # ver override logo abaixo (leads_funil)
         'contratos': sum(c['contratos'] for c in closers_out),
+        'no_show': sum(c['no_show'] for c in closers_out),
     }
     consolidado['conversao'] = {
         'cc1_para_fpq': pct(consolidado['fpq_realizada'], consolidado['cc1_realizada']),
         'fpq_para_cc2': pct(consolidado['cc2_realizada'], consolidado['fpq_realizada']),
         'cc2_para_cc3': pct(consolidado['cc3_realizada'], consolidado['cc2_realizada']),
     }
+    consolidado['pct_no_show'] = pct(consolidado['no_show'], consolidado['cc1_realizada'] + consolidado['no_show'])
 
     # Total do funil (todo negócio criado no mês, qualquer dono — inclui SDR/
     # Qualificadora) — guardado só como referência (leads_funil), não usado como
@@ -619,6 +645,7 @@ dashboard_inbound = {
         ['cc3_futura', 'CC3 a acontecer'],
         ['contrato_enviado', 'Contrato enviado'],
         ['contratos', 'Contratos fechados'],
+        ['no_show', 'No-show'],
     ],
 }
 dashboard_outbound = {

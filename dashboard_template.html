@@ -279,14 +279,27 @@
   </div>
 
   <div class="card" id="card-agendadores" style="display:none;">
-    <h2>Time de agendamento <span class="hint">— % agendamento = agendamentos / leads recebidos; % realizada = CC1 realizada / agendamentos</span></h2>
+    <h2>Time de agendamento <span class="hint">— % agendamento = agendamentos / leads recebidos; % realizada = CC1 realizada / agendamentos; % no-show = no-show / agendamentos. "Faltam" = quanto falta pra bater a própria meta (30%/65%) com o que já foi feito até agora</span></h2>
     <div style="overflow-x:auto">
       <table id="agendadores-table">
         <thead>
           <tr>
             <th>Agendador</th><th>Leads recebidos</th><th>Agendamentos</th><th>% agendamento</th>
-            <th>Realizadas</th><th>% realizada</th>
+            <th>Realizadas</th><th>% realizada</th><th>No-show</th><th>% no-show</th>
+            <th>Faltam p/ meta</th>
           </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" id="card-no-show-closers" style="display:none;">
+    <h2>No-show por closer <span class="hint">— % no-show = no-show / (CC1 realizada + no-show) no mês</span></h2>
+    <div style="overflow-x:auto">
+      <table id="no-show-closers-table">
+        <thead>
+          <tr><th>Closer</th><th>CC1 realizada</th><th>No-show</th><th>% no-show</th></tr>
         </thead>
         <tbody></tbody>
       </table>
@@ -1027,7 +1040,12 @@ if (D.agendadores && D.agendadores.length) {
     const color = cls === 'ahead' ? 'var(--green)' : 'var(--orange)';
     return `<td style="color:${color};font-weight:700">${v}% <span style="color:var(--text-dim);font-weight:400">/ meta ${meta}%</span></td>`;
   }
-  document.querySelector('#agendadores-table tbody').innerHTML = D.agendadores.map(a => `
+  document.querySelector('#agendadores-table tbody').innerHTML = D.agendadores.map(a => {
+    const faltas = [];
+    if (a.faltam_agendamentos > 0) faltas.push(`${a.faltam_agendamentos} agendamento${a.faltam_agendamentos === 1 ? '' : 's'}`);
+    if (a.faltam_realizadas > 0) faltas.push(`${a.faltam_realizadas} realizada${a.faltam_realizadas === 1 ? '' : 's'}`);
+    const faltaTxt = faltas.length ? faltas.join(' · ') : '<span style="color:var(--green)">em dia</span>';
+    return `
     <tr>
       <td>${a.nome}</td>
       <td>${a.leads_recebidos}</td>
@@ -1035,6 +1053,23 @@ if (D.agendadores && D.agendadores.length) {
       ${pctCell(a.pct_agendamento, D.agendadores_meta.meta_agendamento_pct)}
       <td>${a.realizadas}</td>
       ${pctCell(a.pct_realizada, D.agendadores_meta.meta_realizada_pct)}
+      <td>${a.no_show}</td>
+      <td>${a.pct_no_show === null ? '—' : a.pct_no_show + '%'}</td>
+      <td>${faltaTxt}</td>
+    </tr>
+  `;
+  }).join('');
+}
+
+// ===== No-show por closer =====
+if (D.closers && D.closers.length) {
+  document.getElementById('card-no-show-closers').style.display = '';
+  document.querySelector('#no-show-closers-table tbody').innerHTML = D.closers.map(c => `
+    <tr>
+      <td>${c.nome}</td>
+      <td>${c.cc1_realizada}</td>
+      <td>${c.no_show}</td>
+      <td>${c.pct_no_show === null ? '—' : c.pct_no_show + '%'}</td>
     </tr>
   `).join('');
 }

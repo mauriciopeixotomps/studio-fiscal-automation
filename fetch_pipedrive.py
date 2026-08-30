@@ -377,8 +377,55 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
 df_deals = pd.DataFrame(deals_rows)
 df_deals.to_excel(os.path.join(OUT_DIR, 'deals.xlsx'), index=False)
 n_leads = df_deals['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_deals) else 0
-n_contratos = ((df_deals['status'] == 'won') & df_deals['won_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END))).sum() if len(df_deals) else 0
+won_no_mes_mask = (df_deals['status'] == 'won') & df_deals['won_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)) if len(df_deals) else pd.Series(dtype=bool)
+n_contratos = won_no_mes_mask.sum() if len(df_deals) else 0
 print(f'   leads no mês: {n_leads} | contratos (Ganho) no mês: {n_contratos}')
+
+# ============= PRODUTOS dos contratos (Franquia com valor x Partner de graça) =============
+# Só busca produto pro que já é contrato fechado no mês (29/08/2026) — o time quer
+# separar, no relatório, quantos contratos são de Franquia (produto com valor) e
+# quantos são "Contrato Partner" (produto de parceria, sem valor de aquisição).
+print('-> Fetching produtos dos contratos fechados no mês...')
+
+
+def _fetch_deal_products(deal_id):
+    url = f'{BASE}/deals/{deal_id}/products?api_token={TOKEN}'
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                body = json.loads(r.read())
+            return deal_id, body.get('data') or []
+        except Exception:
+            if attempt == 3:
+                return deal_id, []
+            time.sleep(2 * (attempt + 1))
+    return deal_id, []
+
+
+def _classifica_produtos(produtos):
+    nomes = [p.get('name') or '' for p in produtos]
+    if any(n.startswith('Franquia') for n in nomes):
+        return 'franquia'
+    if any(n == 'Contrato Partner' for n in nomes):
+        return 'partner'
+    return None
+
+
+produto_rows = []
+if len(df_deals) and won_no_mes_mask.any():
+    deal_ids_contratos = df_deals.loc[won_no_mes_mask, 'deal_id'].tolist()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for deal_id, produtos in executor.map(_fetch_deal_products, deal_ids_contratos):
+            produto_rows.append({
+                'deal_id': deal_id,
+                'produtos': ', '.join(p.get('name') or '' for p in produtos) or None,
+                'tipo_contrato': _classifica_produtos(produtos),
+            })
+    n_franquia = sum(1 for r in produto_rows if r['tipo_contrato'] == 'franquia')
+    n_partner = sum(1 for r in produto_rows if r['tipo_contrato'] == 'partner')
+    n_sem = sum(1 for r in produto_rows if r['tipo_contrato'] is None)
+    print(f'   contratos: franquia={n_franquia} | partner={n_partner} | sem produto/não classificado={n_sem}')
+pd.DataFrame(produto_rows).to_excel(os.path.join(OUT_DIR, 'deals_produtos.xlsx'), index=False)
 
 # ============= NEGÓCIOS DO FUNIL STUDIO FISCAL FRANQUIA (pipeline 62, todos) =============
 # "Negócios iniciados" (leads) considera TODO negócio criado no funil, independente

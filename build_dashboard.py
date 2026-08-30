@@ -39,6 +39,7 @@ deals_p62 = load('deals_pipeline62.xlsx')
 deals_p66 = load('deals_pipeline66.xlsx')
 deals_p65 = load('deals_pipeline65.xlsx')  # REBARBA STUDIO FISCAL FRANQUIA
 deals_p69 = load('deals_pipeline69.xlsx')  # OUTBOUND - EVENTOS (reportado junto com o 66)
+deals_produtos = load('deals_produtos.xlsx')  # tipo_contrato: 'franquia' (tem valor) / 'partner' (de graça)
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
 agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
@@ -46,6 +47,10 @@ no_show_re = load('activities_no_show.xlsx')
 
 if not deals.empty:
     deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+    if not deals_produtos.empty:
+        deals = deals.merge(deals_produtos[['deal_id', 'tipo_contrato']], on='deal_id', how='left')
+    else:
+        deals['tipo_contrato'] = None
 if not deals_p62.empty:
     deals_p62 = deals_p62[~deals_p62['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not deals_p66.empty:
@@ -268,6 +273,31 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
                     by_deal[deal_id] = min(day, by_deal.get(deal_id, day))
         return by_deal
 
+    def contratos_por_tipo(nome, tipo):
+        """Conta contratos (Ganho, won_time no mês) do closer, filtrando por
+        tipo_contrato ('franquia' tem valor / 'partner' de graça / None = sem
+        produto vinculado ou não reconhecido — ver fetch_pipedrive.py)."""
+        if deals_pipe.empty or 'closer_nome' not in deals_pipe.columns:
+            return 0
+        d = deals_pipe[(deals_pipe['closer_nome'] == nome) & (deals_pipe['status'] == 'won')].copy()
+        d = d[d['tipo_contrato'].isna()] if tipo is None else d[d['tipo_contrato'] == tipo]
+        if d.empty:
+            return 0
+        d['won_time'] = pd.to_datetime(d['won_time'], errors='coerce').dt.date
+        return int(d['won_time'].apply(lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END).sum())
+
+    def contratos_diario_por_tipo(nome, tipo):
+        if deals_pipe.empty or 'closer_nome' not in deals_pipe.columns:
+            return {}
+        d = deals_pipe[(deals_pipe['closer_nome'] == nome) & (deals_pipe['status'] == 'won')].copy()
+        d = d[d['tipo_contrato'].isna()] if tipo is None else d[d['tipo_contrato'] == tipo]
+        d['won_time'] = pd.to_datetime(d['won_time'], errors='coerce').dt.date
+        out = {}
+        for day in d['won_time'].dropna():
+            if config.MONTH_START <= day <= config.MONTH_END:
+                out[day.isoformat()] = out.get(day.isoformat(), 0) + 1
+        return out
+
     def leads_count(nome):
         if leads_mode == 'iniciados':
             return len(negocios_iniciados_por_deal(nome))
@@ -293,6 +323,8 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
             'contrato_enviado': count_by_closer(contrato_enviado_re, nome),
             'leads': leads_count(nome),
             'contratos': sum(per_closer_daily(deals_pipe, 'won_time', nome, status='won').values()),
+            'contratos_franquia': contratos_por_tipo(nome, 'franquia'),
+            'contratos_partner': contratos_por_tipo(nome, 'partner'),
             'no_show': count_by_closer(no_show_p, nome),
         }
         m['conversao'] = {
@@ -319,6 +351,8 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
             'cc3_futura': per_closer_daily(cc3_fut_p, 'due_date', c['nome']),
             'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
             'contratos': per_closer_daily(deals_pipe, 'won_time', c['nome'], status='won'),
+            'contratos_franquia': contratos_diario_por_tipo(c['nome'], 'franquia'),
+            'contratos_partner': contratos_diario_por_tipo(c['nome'], 'partner'),
             'no_show': per_closer_daily(no_show_p, 'marked_as_done_time', c['nome']),
         }
         closers_out.append({'nome': c['nome'], 'foto': c['foto'], **metrics, 'diario': diario})
@@ -334,6 +368,8 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         'contrato_enviado': sum(c['contrato_enviado'] for c in closers_out),
         'leads': sum(c['leads'] for c in closers_out),  # ver override logo abaixo (leads_funil)
         'contratos': sum(c['contratos'] for c in closers_out),
+        'contratos_franquia': sum(c['contratos_franquia'] for c in closers_out),
+        'contratos_partner': sum(c['contratos_partner'] for c in closers_out),
         'no_show': sum(c['no_show'] for c in closers_out),
     }
     consolidado['conversao'] = {
@@ -680,6 +716,8 @@ dashboard_inbound = {
         ['cc3_futura', 'CC3 a acontecer'],
         ['contrato_enviado', 'Contrato enviado'],
         ['contratos', 'Contratos fechados'],
+        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
+        ['contratos_partner', 'Contratos Partner (grátis)'],
         ['no_show', 'No-show'],
     ],
 }
@@ -709,6 +747,8 @@ dashboard_outbound = {
         ['cc3_futura', 'CC3 a acontecer'],
         ['contrato_enviado', 'Contrato enviado'],
         ['contratos', 'Contratos fechados'],
+        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
+        ['contratos_partner', 'Contratos Partner (grátis)'],
     ],
 }
 dashboard_rebarba = {

@@ -134,6 +134,7 @@ print(f'   {len(df)} linhas de previsão')
 col_modelo = next((c for c in df.columns if c.lower() == 'modelo'), None)
 col_bandeira = next((c for c in df.columns if c.lower() == 'bandeira'), None)
 col_confianca = next((c for c in df.columns if c.lower() in ('confiança', 'confianca', 'termômetro', 'termometro')), None)
+col_funil = next((c for c in df.columns if c.lower() == 'funil'), None)
 
 rows = []
 for _, r in df.iterrows():
@@ -189,6 +190,10 @@ for _, r in df.iterrows():
         # classifica pelo produto de verdade vinculado no Pipedrive (mesma lógica dos
         # contratos fechados).
         'tipo_contrato': _tipo_contrato(deal_id),
+        # Qual página (Inbound/Outbound/Rebarba) esse negócio previsto pertence —
+        # normaliza maiúscula/minúscula ("INBOUND", "Rebarba" etc. já vêm misturados
+        # na planilha) pra comparar sem erro (31/08/2026).
+        'funil': str(r.get(col_funil)).strip().upper() if col_funil and pd.notna(r.get(col_funil)) else None,
     })
 
 df_out = pd.DataFrame(rows)

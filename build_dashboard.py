@@ -152,20 +152,11 @@ if not previsao.empty:
                 row[k] = None
         previsao_out.append(row)
 
-# Placar do mês: "Previsto" continua vindo da planilha de Previsão (compartilhado,
-# não é por pipeline — é a lista de trabalho manual do time). "Realizado" (Contratos
-# fechados/Venda/Caixa) agora vem DIRETO do Pipedrive — mesmo negócio Ganho no mês
-# que o card "Metas do mês" já conta — em vez de depender de alguém preencher a
-# planilha com o link certo. Isso é calculado dentro de build_page() (por pipeline).
-# Negócio já Ganho (deal_status == 'won') sai do "Previsto" — não é mais previsão,
-# já é passado (e já conta do lado do Realizado); sem isso um negócio fechado ficava
-# contado nos dois ao mesmo tempo (31/08/2026).
-previsao_pendente = [r for r in previsao_out if r.get('deal_status') != 'won']
-scoreboard_previsto = {
-    'contratos_previstos': len(previsao_pendente),
-    'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),
-    'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_pendente),
-}
+# Placar do mês: "Previsto" vem da planilha de Previsão, filtrado pela coluna FUNIL
+# (Inbound/Outbound/Rebarba) — calculado dentro de build_page(), por página, não
+# mais aqui (ver comentário lá). "Realizado" (Contratos fechados/Venda/Caixa) vem
+# DIRETO do Pipedrive — mesmo negócio Ganho no mês que o card "Metas do mês" já
+# conta — em vez de depender de alguém preencher a planilha com o link certo.
 
 # ============= TIME DE AGENDAMENTO (SDRs dedicados à Studio Fiscal) =============
 # "Realizada"/"No-show" cruzam o negócio do agendamento com os CC1 Realizada e os
@@ -213,7 +204,7 @@ agendadores_meta = {
 }
 
 
-def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta):
+def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta, funil_nome):
     """Monta o dict de dados de UMA página (inbound, outbound, rebarba...), filtrando
     CC1/CC2/CC3/FPQ pelo pipeline_id do negócio vinculado — pra não misturar atividade
     de um funil no número do outro. pipeline_ids é uma lista pra dar pra juntar mais de
@@ -587,6 +578,19 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     if not dw.empty:
         dw['won_time'] = pd.to_datetime(dw['won_time'], errors='coerce')
         dw = dw[(dw['won_time'].dt.date >= config.MONTH_START) & (dw['won_time'].dt.date <= config.MONTH_END)]
+
+    # "Previsto" agora é filtrado pela coluna FUNIL da planilha (Inbound/Outbound/
+    # Rebarba) — cada página só vê os negócios previstos do próprio funil, em vez
+    # da mesma lista repetida nas três (31/08/2026, coluna adicionada pelo time).
+    # Linha sem FUNIL preenchido não aparece em nenhuma página (não dá pra saber
+    # de qual é) até alguém preencher.
+    previsao_funil = [r for r in previsao_out if r.get('funil') == funil_nome]
+    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won']
+    scoreboard_previsto = {
+        'contratos_previstos': len(previsao_pendente),
+        'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),
+        'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_pendente),
+    }
     scoreboard = {
         **scoreboard_previsto,
         'contratos_fechados': int(len(dw)),
@@ -605,6 +609,7 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         'ranking': ranking,
         'heatmap_cc1': heatmap_cc1,
         'fpqs_recebidas': fpqs_recebidas,
+        'previsao': previsao_funil,
         'scoreboard': scoreboard,
     }
 
@@ -615,7 +620,6 @@ common = {
     'periodo_fim': config.MONTH_END.isoformat(),
     'gerado_em': pd.Timestamp.now(tz=ZoneInfo('America/Sao_Paulo')).strftime('%Y-%m-%dT%H:%M'),
     'ritmo': ritmo,
-    'previsao': previsao_out,
 }
 
 inbound_data = build_page(
@@ -626,6 +630,7 @@ inbound_data = build_page(
     meta_leads=metas.get('meta_leads'),
     meta_contratos_val=metas['meta_contratos'],
     tem_meta=True,
+    funil_nome='INBOUND',
 )
 # "Consolidado do time" (Inbound) ganha 2 etapas antes da CC1 — Leads iniciados (já
 # calculado acima) e Leads qualificados (atividade Qualificação Realizada, feita pelo
@@ -651,6 +656,7 @@ outbound_data = build_page(
     meta_leads=None,
     meta_contratos_val=None,
     tem_meta=False,
+    funil_nome='OUTBOUND',
 )
 # Rebarba (65) — reativação de perdidos, página própria, ainda sem meta (29/08/2026).
 rebarba_data = build_page(
@@ -661,6 +667,7 @@ rebarba_data = build_page(
     meta_leads=None,
     meta_contratos_val=None,
     tem_meta=False,
+    funil_nome='REBARBA',
 )
 
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============

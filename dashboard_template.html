@@ -207,6 +207,36 @@
   a.link:hover { text-decoration: underline; }
 
   .chart-wrap { height: 280px; }
+
+  /* ===== Mobile (ajuste 31/08/2026) =====
+     Vários grids acima usam "repeat(auto-fit, minmax(Npx, 1fr))" com N grande
+     (280-420px) — em telas estreitas o grid não consegue encolher abaixo desse
+     mínimo nem virando 1 coluna só, e o conteúdo (ou a página inteira) vaza pra
+     fora da tela. Mesma coisa com linhas de grid de colunas fixas em px (funil,
+     motivos de perdido): a soma das colunas fixas passa da largura disponível.
+     Aqui força tudo a virar 1 coluna e encolhe as colunas fixas que ainda
+     sobrariam largas demais. */
+  @media (max-width: 640px) {
+    body { padding: 12px; }
+    .card { padding: 14px; }
+    .meta-grid, .pace-grid, .scoreboard, .compare-grid, .lost-split, .ranking-grid, .kpi-grid {
+      grid-template-columns: 1fr;
+    }
+    .ranking-cols { grid-template-columns: 1fr; }
+    .funnel-row {
+      grid-template-columns: 84px 1fr 34px 52px;
+      gap: 6px;
+    }
+    .funnel-label { font-size: 12px; overflow-wrap: anywhere; }
+    .funnel-val, .funnel-conv { font-size: 12px; }
+    .lost-reason-row {
+      grid-template-columns: 90px 1fr 26px;
+      gap: 6px;
+    }
+    .lost-reason-row .l { font-size: 12px; overflow-wrap: anywhere; }
+    .lost-summary { gap: 12px; }
+    .card-row .card { min-width: 0; flex-basis: 100%; }
+  }
 </style>
 </head>
 <body>

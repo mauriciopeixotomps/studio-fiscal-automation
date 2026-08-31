@@ -798,6 +798,8 @@ dashboard_rebarba = {
         ['cc3_futura', 'CC3 a acontecer'],
         ['contrato_enviado', 'Contrato enviado'],
         ['contratos', 'Contratos fechados'],
+        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
+        ['contratos_partner', 'Contratos Partner (grátis)'],
         ['no_show', 'No-show'],
     ],
 }

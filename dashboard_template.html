@@ -257,30 +257,31 @@
   .export-btn:hover { border-color: var(--accent); }
   .export-btn:disabled { opacity: .6; cursor: wait; }
   @media print {
-    /* PDF pelo "Imprimir" do navegador. Problemas do 1º teste (31/08/2026):
-       - fundo escuro virava branco (navegador não imprime cor de fundo por
-         padrão) -> print-color-adjust.
-       - painel é largo (vários cards lado a lado) e o PDF cortava conteúdo na
-         borda da página em vez de encolher -> @page paisagem + tudo em 1
-         coluna só, igual ao ajuste mobile.
-       - tabela com scroll (Relatório, Previsão, Time de agendamento) só
-         imprimia o pedaço visível -> tira o max-height/overflow e deixa o
-         texto quebrar linha em vez de correr pra fora da folha.
-       - botões de navegação/exportar não fazem sentido no papel. */
-    @page { size: A4 landscape; margin: 12mm; }
+    /* PDF pelo "Imprimir" do navegador.
+       2º teste (31/08/2026) veio muito pior que o 1º: forçar tudo em 1 coluna
+       só (bom pro mobile) deixou cards gigantes (o de Ritmo, com 7 gráficos,
+       por exemplo) MUITO mais altos, e "break-inside:avoid" no card inteiro
+       empurrava esse bloco todo pra página seguinte inteiro, deixando a
+       página anterior com um vazio enorme embaixo — 17 páginas em vez de 7.
+       Correção: mantém o layout de colunas normal (papel paisagem tem espaço
+       de sobra pra isso, é o oposto do celular) e só evita quebra no nível
+       de cada ITEM pequeno (gráfico, linha do funil, bloco de meta), nunca no
+       card inteiro — assim o conteúdo flui e enche a página em vez de pular
+       fora dela. Margem mínima (não dá pra zerar de verdade — a maioria dos
+       navegadores sempre reserva uma margem não imprimível da impressora). */
+    @page { size: A4 landscape; margin: 4mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    html, body { background: var(--bg) !important; }
     .page-nav-link, .export-btn, #month-nav-link, #paginas-irmas-nav { display: none !important; }
-    body { padding: 0; }
-    .meta-grid, .pace-grid, .scoreboard, .compare-grid, .lost-split, .ranking-grid, .kpi-grid, .ranking-cols {
-      grid-template-columns: 1fr !important;
+    body { padding: 6px; }
+    .card { margin-bottom: 10px; padding: 12px; }
+    .pace-card, .score-item, .compare-card, .meta-block, .kpi, .rk-row, .relatorio-card {
+      break-inside: avoid;
     }
-    .card-row { flex-direction: column; }
-    .card-row .card { min-width: 0; flex-basis: 100%; }
     .relatorio-table-wrap, .heatmap-wrap, [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
       max-height: none !important; overflow: visible !important;
     }
     .relatorio-table-wrap table th, .relatorio-table-wrap table td { white-space: normal !important; }
-    .card { break-inside: avoid; }
   }
 </style>
 </head>

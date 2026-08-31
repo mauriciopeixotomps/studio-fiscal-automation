@@ -130,13 +130,18 @@
 
   /* ===== Ranking campanhas/criativos ===== */
   .ranking-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 20px; }
+  /* Sem isso os dois blocos (Campanhas / Criativos) ficavam só separados por
+     espaço em branco — em tela larga o gap de 20px sumia no meio de colunas
+     enormes e virava tudo uma coisa só, sem indicar onde um bloco termina e o
+     outro começa (31/08/2026). */
+  .ranking-block { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
   .ranking-block h4 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
   .ranking-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
   .ranking-list { display: flex; flex-direction: column; gap: 6px; }
   .ranking-list .rk-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
   .ranking-list.best .rk-title { color: var(--green); }
   .ranking-list.worst .rk-title { color: var(--red); }
-  .rk-row { background: var(--card-hi); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .rk-row { background: var(--card); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
   .rk-row .rk-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rk-row .rk-nums { color: var(--text-dim); margin-top: 2px; }
 
@@ -330,7 +335,7 @@
   </div>
 
   <div class="card">
-    <h2>Consolidado do time <span class="hint">— funil CC1 → FPQ → CC2 → CC3 → Contrato enviado → Fechado</span></h2>
+    <h2>Consolidado do time <span class="hint" id="consolidado-hint">— funil CC1 → FPQ → CC2 → CC3 → Contrato enviado → Fechado</span></h2>
     <div id="funnel-consolidado" class="funnel"></div>
   </div>
 
@@ -680,9 +685,24 @@ Object.keys(D.pace).forEach(key => {
 });
 
 // ===== Funil (consolidado e por closer) =====
+function convPct(val, base) {
+  return base ? Math.round(1000 * val / base) / 10 : null;
+}
 function funnelStages(m) {
-  return [
+  // "Leads qualificados"/"Agendado"/"Realizado" só existem no consolidado do
+  // Inbound (m.leads_qualificados) — no comparativo por closer o funil continua
+  // começando em "CC1 realizada" (a qualificação é feita pelo time de
+  // qualificação, não por um closer específico).
+  const pre = m.leads_qualificados === undefined ? [
     ['CC1 realizada', m.cc1_realizada, undefined],
+  ] : [
+    ['Leads iniciados', m.leads, undefined],
+    ['Leads qualificados', m.leads_qualificados, convPct(m.leads_qualificados, m.leads)],
+    ['Agendado', m.cc1_agendado, convPct(m.cc1_agendado, m.leads_qualificados)],
+    ['Realizado', m.cc1_realizada, convPct(m.cc1_realizada, m.cc1_agendado)],
+  ];
+  return [
+    ...pre,
     ['FPQ recebida', m.fpq_realizada, m.conversao.cc1_para_fpq],
     ['CC2 realizada', m.cc2_realizada, m.conversao.fpq_para_cc2],
     ['CC3 realizada', m.cc3_realizada, m.conversao.cc2_para_cc3],
@@ -704,6 +724,10 @@ function renderFunnel(elId, m) {
   `).join('');
 }
 renderFunnel('funnel-consolidado', D.consolidado);
+if (D.consolidado.leads_qualificados !== undefined) {
+  document.getElementById('consolidado-hint').textContent =
+    '— funil Leads iniciados → Leads qualificados → Agendado → Realizado → FPQ → CC2 → CC3 → Contrato enviado → Fechado';
+}
 
 // ===== Perdidos =====
 document.getElementById('lost-total').textContent = D.perdidos.total;
@@ -1056,8 +1080,12 @@ tbody.innerHTML = D.previsao.map(r => `
 
 function previsaoSomar(rows) {
   return rows.reduce((acc, r) => {
-    acc.venda += r.venda || 0;
-    acc.caixa += r.caixa || 0;
+    // Negócio já Ganho não conta mais como "previsto" (venda/caixa) — já virou
+    // passado, e já está somado do lado do realizado logo abaixo.
+    if (r.deal_status !== 'won') {
+      acc.venda += r.venda || 0;
+      acc.caixa += r.caixa || 0;
+    }
     acc.venda_realizada += r.venda_realizada || 0;
     acc.caixa_realizado += r.caixa_realizado || 0;
     return acc;
@@ -1078,9 +1106,13 @@ function previsaoTotalRowHtml(label, rows) {
     </tr>`;
 }
 const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente');
+const previsaoFranquia = D.previsao.filter(r => r.tipo_contrato === 'franquia');
+const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
   previsaoTotalRowHtml('Total geral', D.previsao) +
-  previsaoTotalRowHtml('Total só Quentes', previsaoQuentes)
+  previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
+  previsaoTotalRowHtml('Total Franquia (c/ valor)', previsaoFranquia) +
+  previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner)
 ) : '';
 
 // ===== Time de agendamento (SDRs dedicados) =====

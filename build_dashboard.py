@@ -43,6 +43,7 @@ deals_produtos = load('deals_produtos.xlsx')  # tipo_contrato: 'franquia' (tem v
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
 agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
+qualificacao_re = load('activities_qualificacao_realizada.xlsx')
 no_show_re = load('activities_no_show.xlsx')
 
 if not deals.empty:
@@ -156,10 +157,14 @@ if not previsao.empty:
 # fechados/Venda/Caixa) agora vem DIRETO do Pipedrive — mesmo negócio Ganho no mês
 # que o card "Metas do mês" já conta — em vez de depender de alguém preencher a
 # planilha com o link certo. Isso é calculado dentro de build_page() (por pipeline).
+# Negócio já Ganho (deal_status == 'won') sai do "Previsto" — não é mais previsão,
+# já é passado (e já conta do lado do Realizado); sem isso um negócio fechado ficava
+# contado nos dois ao mesmo tempo (31/08/2026).
+previsao_pendente = [r for r in previsao_out if r.get('deal_status') != 'won']
 scoreboard_previsto = {
-    'contratos_previstos': len(previsao_out),
-    'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_out),
-    'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_out),
+    'contratos_previstos': len(previsao_pendente),
+    'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),
+    'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_pendente),
 }
 
 # ============= TIME DE AGENDAMENTO (SDRs dedicados à Studio Fiscal) =============
@@ -621,6 +626,18 @@ inbound_data = build_page(
     meta_leads=metas.get('meta_leads'),
     meta_contratos_val=metas['meta_contratos'],
     tem_meta=True,
+)
+# "Consolidado do time" (Inbound) ganha 2 etapas antes da CC1 — Leads iniciados (já
+# calculado acima) e Leads qualificados (atividade Qualificação Realizada, feita pelo
+# time de qualificação) — mais "Agendado"/"Realizado" no lugar do que era só "CC1
+# realizada" (31/08/2026). Só no Inbound: é a etapa que antecede o funil 62.
+_qualif_p62 = (
+    qualificacao_re[qualificacao_re['pipeline_id'] == config.PIPELINE_STUDIO_FISCAL_FRANQUIA]
+    if not qualificacao_re.empty and 'pipeline_id' in qualificacao_re.columns else qualificacao_re.iloc[0:0]
+)
+inbound_data['consolidado']['leads_qualificados'] = int(len(_qualif_p62))
+inbound_data['consolidado']['cc1_agendado'] = (
+    inbound_data['consolidado']['cc1_realizada'] + inbound_data['consolidado']['cc1_futura']
 )
 # Outbound = funil próprio (66) + Eventos (69) juntos numa página só, a pedido do
 # time (29/08/2026) — "Eventos" não tem etiqueta de marca nenhuma e é 100% Fiscal,

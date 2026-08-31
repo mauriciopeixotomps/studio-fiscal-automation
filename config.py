@@ -94,6 +94,12 @@ ACT_FPQ = 'fpq_recebida'        # id 13 — FPQ Recebida
 ACT_CC2 = 'cc2_realizada1'      # id 10 — CC2 Realizada (done=true) / CC2 Para Acontecer (done=false)
 ACT_CC3 = 'cc3_realizada'       # id 32 — CC3 Realizada
 
+# "Leads qualificados" (Consolidado do time, antes da CC1) — existem DUAS chaves de
+# atividade chamadas "Qualificação Realizada" na conta ('qualificacao_realizada' e
+# 'qualificacao_realizada1'); confirmado em 31/08/2026 que só a com "1" no fim tem
+# uso real (a outra tem zero atividades em toda a história da conta).
+ACT_QUALIFICACAO_REALIZADA = 'qualificacao_realizada1'
+
 # Atividades do agendador: "Leads recebidos" = 1ª tentativa de contato criada pra ele
 # (task que nasce quando o lead é roteado pra ele); "Agendamento" = CC1 marcada como
 # agendada por ele (manual ou pelo bot) — a CC1 em si (config.ACT_CC1) fica na agenda

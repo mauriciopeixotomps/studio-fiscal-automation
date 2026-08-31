@@ -237,6 +237,23 @@ for act_type, rows in no_show_raw.items():
             no_show_rows.append(row)
 print(f'   no-show no mês (todos closers): {len(no_show_rows)}')
 
+# ============= LEADS QUALIFICADOS (Qualificação Realizada) =============
+# Etapa anterior à CC1 no "Consolidado do time" (31/08/2026) — feita pelo time de
+# qualificação (SDRs), não por um dos 4 closers, então busca sem filtrar por
+# user_id (diferente de CC1/CC2/CC3/FPQ, que são só dos closers).
+print('-> Fetching Qualificação Realizada (time de qualificação, sem filtro de dono)...')
+qualificacao_raw = fetch_all('activities', {
+    'type': config.ACT_QUALIFICACAO_REALIZADA,
+    'start_date': config.FETCH_START.isoformat(),
+    'end_date': config.FETCH_END.isoformat(),
+})
+qualificacao_rows = []
+for a in qualificacao_raw:
+    a = _correct_activity_tz(a)
+    if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END):
+        qualificacao_rows.append(act_row(a))
+print(f'   qualificação realizada no mês: {len(qualificacao_rows)}')
+
 # ============= PIPELINE (e UTM da CC1) do negócio vinculado =============
 # Enriquece TODA atividade (CC1/CC2/CC3/FPQ, realizada e futura) com o pipeline_id
 # do negócio vinculado — pra dar pra separar Studio Fiscal (62) de Outbound (66)
@@ -260,7 +277,7 @@ def _fetch_deal_utm(deal_id):
     return deal_id, None, None, None
 
 
-all_rows = [r for rows in all_realizada.values() for r in rows] + [r for rows in all_futura.values() for r in rows] + no_show_rows
+all_rows = [r for rows in all_realizada.values() for r in rows] + [r for rows in all_futura.values() for r in rows] + no_show_rows + qualificacao_rows
 unique_deal_ids = sorted({r['negocio_id'] for r in all_rows if r.get('negocio_id')})
 utm_by_deal = {}
 if unique_deal_ids:
@@ -283,6 +300,7 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
         pd.DataFrame(all_futura[stage_key]).to_excel(os.path.join(OUT_DIR, f'activities_{stage_key}_futura.xlsx'), index=False)
 pd.DataFrame(cc1_realizada_rows).to_excel(os.path.join(OUT_DIR, 'activities_cc1_realizada.xlsx'), index=False)
 pd.DataFrame(no_show_rows).to_excel(os.path.join(OUT_DIR, 'activities_no_show.xlsx'), index=False)
+pd.DataFrame(qualificacao_rows).to_excel(os.path.join(OUT_DIR, 'activities_qualificacao_realizada.xlsx'), index=False)
 
 # ============= AGENDADORES (leads recebidos / agendamentos / realizadas) =============
 # "Leads recebidos" = 1ª tentativa de contato criada pro agendador (due_date = quando

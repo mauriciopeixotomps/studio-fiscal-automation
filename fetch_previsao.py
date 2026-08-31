@@ -87,6 +87,34 @@ def _fetch_deal(deal_id):
     return None
 
 
+def _fetch_deal_produtos(deal_id):
+    url = f'{BASE}/deals/{deal_id}/products?api_token={TOKEN}'
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                body = json.loads(r.read())
+            return body.get('data') or []
+        except Exception:
+            if attempt == 3:
+                return []
+            time.sleep(2 * (attempt + 1))
+    return []
+
+
+def _tipo_contrato(deal_id):
+    """'franquia' (produto com valor) / 'partner' (Contrato Partner, de graça) /
+    None (sem produto vinculado ou não reconhecido) — mesma classificação usada
+    pros contratos fechados em fetch_pipedrive.py."""
+    if not deal_id:
+        return None
+    nomes = [p.get('name') or '' for p in _fetch_deal_produtos(deal_id)]
+    if any(n.startswith('Franquia') for n in nomes):
+        return 'franquia'
+    if any(n == 'Contrato Partner' for n in nomes):
+        return 'partner'
+    return None
+
+
 print('-> Baixando planilha de previsão (CSV)...')
 with urllib.request.urlopen(config.PREVISAO_CSV_URL, timeout=30) as r:
     csv_text = r.read().decode('utf-8')
@@ -156,6 +184,11 @@ for _, r in df.iterrows():
         'venda_realizada': venda_realizada,
         'caixa_realizado': caixa_realizado,
         'won_time': won_time,
+        # 'Modelo' na planilha é o NOME comercial do plano (TAX/Platinum/Corporate/GS
+        # Partner/GS Black) — não indica se é o "Contrato Partner" de graça, então
+        # classifica pelo produto de verdade vinculado no Pipedrive (mesma lógica dos
+        # contratos fechados).
+        'tipo_contrato': _tipo_contrato(deal_id),
     })
 
 df_out = pd.DataFrame(rows)

@@ -257,13 +257,29 @@
   .export-btn:hover { border-color: var(--accent); }
   .export-btn:disabled { opacity: .6; cursor: wait; }
   @media print {
-    /* PDF pelo "Imprimir" do navegador: sem isso o fundo escuro vira branco (a
-       maioria dos navegadores não imprime cor de fundo por padrão), os botões
-       de navegação/exportar aparecem no papel à toa, e as tabelas com scroll
-       interno (Relatório por closer) só imprimiam a parte visível na tela. */
+    /* PDF pelo "Imprimir" do navegador. Problemas do 1º teste (31/08/2026):
+       - fundo escuro virava branco (navegador não imprime cor de fundo por
+         padrão) -> print-color-adjust.
+       - painel é largo (vários cards lado a lado) e o PDF cortava conteúdo na
+         borda da página em vez de encolher -> @page paisagem + tudo em 1
+         coluna só, igual ao ajuste mobile.
+       - tabela com scroll (Relatório, Previsão, Time de agendamento) só
+         imprimia o pedaço visível -> tira o max-height/overflow e deixa o
+         texto quebrar linha em vez de correr pra fora da folha.
+       - botões de navegação/exportar não fazem sentido no papel. */
+    @page { size: A4 landscape; margin: 12mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     .page-nav-link, .export-btn, #month-nav-link, #paginas-irmas-nav { display: none !important; }
-    .relatorio-table-wrap { max-height: none !important; overflow: visible !important; }
+    body { padding: 0; }
+    .meta-grid, .pace-grid, .scoreboard, .compare-grid, .lost-split, .ranking-grid, .kpi-grid, .ranking-cols {
+      grid-template-columns: 1fr !important;
+    }
+    .card-row { flex-direction: column; }
+    .card-row .card { min-width: 0; flex-basis: 100%; }
+    .relatorio-table-wrap, .heatmap-wrap, [style*="overflow-x:auto"], [style*="overflow-x: auto"] {
+      max-height: none !important; overflow: visible !important;
+    }
+    .relatorio-table-wrap table th, .relatorio-table-wrap table td { white-space: normal !important; }
     .card { break-inside: avoid; }
   }
 </style>
@@ -519,20 +535,40 @@ document.getElementById('export-image-btn').addEventListener('click', async () =
   btn.disabled = true;
   btn.textContent = 'Gerando imagem...';
   try {
-    // As tabelas de "Relatório por closer" têm scroll interno (max-height) —
-    // sem isso a imagem sairia cortada igual à tela, mostrando só o que já
-    // estava visível ali dentro. Estica todas antes de capturar e devolve ao
-    // normal depois (a página inteira sempre é maior que a tela, então o
-    // html2canvas já captura o resto rolando por conta própria).
-    const scrollWraps = document.querySelectorAll('.relatorio-table-wrap');
-    const prevStyles = Array.from(scrollWraps).map(el => el.style.maxHeight);
-    scrollWraps.forEach(el => { el.style.maxHeight = 'none'; });
-    const canvas = await html2canvas(document.querySelector('.wrap'), {
+    // Vários blocos rolam por dentro em vez de esticar (max-height nas tabelas
+    // de Relatório, overflow-x:auto na Previsão/Time de agendamento/mapa de
+    // calor). Só tirar o overflow não bastava (testado 31/08/2026): a tabela
+    // continuava do tamanho normal e o conteúdo vazava pra fora do card em vez
+    // de caber, cortando a imagem. Certo é: tirar o overflow E deixar a
+    // largura crescer pro tamanho natural do conteúdo (max-content) em cada
+    // nível — inclusive o .wrap, que tem max-width:1280px — pra a página
+    // inteira alargar de verdade em vez de só "destravar" um scroll que
+    // continua cortando.
+    const wrap = document.querySelector('.wrap');
+    const prevWrapMaxWidth = wrap.style.maxWidth;
+    const prevWrapWidth = wrap.style.width;
+    // max-width:none só tira o TETO — sem width:max-content o elemento continua
+    // do tamanho do pai (que pode ser bem mais estreito que o conteúdo) em vez
+    // de crescer pro tamanho natural do que tem dentro (confirmado testando:
+    // scrollWidth ficava certo mas a largura renderizada real não acompanhava).
+    wrap.style.maxWidth = 'none';
+    wrap.style.width = 'max-content';
+    const scrollEls = document.querySelectorAll(
+      '.relatorio-table-wrap, .heatmap-wrap, [style*="overflow-x:auto"], [style*="overflow-x: auto"]'
+    );
+    const prev = Array.from(scrollEls).map(el => ({ maxHeight: el.style.maxHeight, overflowX: el.style.overflowX, width: el.style.width }));
+    scrollEls.forEach(el => { el.style.maxHeight = 'none'; el.style.overflowX = 'visible'; el.style.width = 'max-content'; });
+    const fullWidth = Math.max(1400, wrap.scrollWidth + 80);
+    const canvas = await html2canvas(wrap, {
       backgroundColor: getComputedStyle(document.body).backgroundColor,
       useCORS: true,
       scale: 2,
+      windowWidth: fullWidth,
+      width: wrap.scrollWidth,
     });
-    scrollWraps.forEach((el, i) => { el.style.maxHeight = prevStyles[i]; });
+    scrollEls.forEach((el, i) => { el.style.maxHeight = prev[i].maxHeight; el.style.overflowX = prev[i].overflowX; el.style.width = prev[i].width; });
+    wrap.style.maxWidth = prevWrapMaxWidth;
+    wrap.style.width = prevWrapWidth;
     const dataUrl = canvas.toDataURL('image/png');
     const a = document.createElement('a');
     a.href = dataUrl;

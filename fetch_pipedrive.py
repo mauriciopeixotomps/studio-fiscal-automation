@@ -239,11 +239,14 @@ print(f'   no-show no mês (todos closers): {len(no_show_rows)}')
 
 # ============= LEADS QUALIFICADOS (Qualificação Realizada) =============
 # Etapa anterior à CC1 no "Consolidado do time" (31/08/2026) — feita pelo time de
-# qualificação (SDRs), não por um dos 4 closers, então busca sem filtrar por
-# user_id (diferente de CC1/CC2/CC3/FPQ, que são só dos closers).
-print('-> Fetching Qualificação Realizada (time de qualificação, sem filtro de dono)...')
+# qualificação (SDRs, ~12 pessoas, não só os 3 agendadores da Fiscal), não por um
+# dos 4 closers. user_id=0 é o valor que a API do Pipedrive usa pra "todo mundo" —
+# sem ele o endpoint /activities só devolve as atividades do dono do token
+# (Mauricio), por isso vinha sempre 0 (31/08/2026).
+print('-> Fetching Qualificação Realizada (time de qualificação inteiro, user_id=0)...')
 qualificacao_raw = fetch_all('activities', {
     'type': config.ACT_QUALIFICACAO_REALIZADA,
+    'user_id': 0,
     'start_date': config.FETCH_START.isoformat(),
     'end_date': config.FETCH_END.isoformat(),
 })

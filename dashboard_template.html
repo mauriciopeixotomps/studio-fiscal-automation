@@ -134,14 +134,19 @@
      espaço em branco — em tela larga o gap de 20px sumia no meio de colunas
      enormes e virava tudo uma coisa só, sem indicar onde um bloco termina e o
      outro começa (31/08/2026). */
-  .ranking-block { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .ranking-block { background: var(--card-hi); border: 1px solid var(--border); border-radius: 12px; padding: 16px; min-width: 0; }
   .ranking-block h4 { font-size: 13px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .04em; margin: 0 0 10px; }
-  .ranking-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-  .ranking-list { display: flex; flex-direction: column; gap: 6px; }
+  /* min-width:0 é necessário nos 3 níveis — item de grid por padrão tem
+     min-width:auto, que respeita o min-content do texto (o nome da campanha
+     inteiro, por causa do white-space:nowrap logo abaixo) em vez do espaço
+     disponível, e a coluna "Piores" vazava pra fora do card em vez de truncar
+     com "..." (31/08/2026). */
+  .ranking-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; min-width: 0; }
+  .ranking-list { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
   .ranking-list .rk-title { font-size: 11px; font-weight: 700; margin-bottom: 4px; }
   .ranking-list.best .rk-title { color: var(--green); }
   .ranking-list.worst .rk-title { color: var(--red); }
-  .rk-row { background: var(--card); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+  .rk-row { background: var(--card); border-radius: 8px; padding: 8px 10px; font-size: 12px; min-width: 0; }
   .rk-row .rk-name { color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .rk-row .rk-nums { color: var(--text-dim); margin-top: 2px; }
 

@@ -1205,12 +1205,10 @@ function previsaoTotalRowHtml(label, rows) {
     </tr>`;
 }
 const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente');
-const previsaoFranquia = D.previsao.filter(r => r.tipo_contrato === 'franquia');
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
   previsaoTotalRowHtml('Total geral', D.previsao) +
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
-  previsaoTotalRowHtml('Total Franquia (c/ valor)', previsaoFranquia) +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner)
 ) : '';
 

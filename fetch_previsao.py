@@ -101,18 +101,24 @@ def _fetch_deal_produtos(deal_id):
     return []
 
 
-def _tipo_contrato(deal_id):
+def _tipo_contrato(deal_id, modelo_texto=None):
     """'franquia' (produto com valor) / 'partner' (Contrato Partner, de graça) /
-    None (sem produto vinculado ou não reconhecido) — mesma classificação usada
-    pros contratos fechados em fetch_pipedrive.py."""
-    if not deal_id:
+    None (sem produto vinculado nem Modelo preenchido). Prioridade: produto de
+    verdade vinculado no Pipedrive (mesma classificação usada pros contratos
+    fechados em fetch_pipedrive.py); se não tiver produto vinculado ainda, cai
+    pro texto da coluna "Modelo" da planilha — confirmado com o time (31/08/2026):
+    "GS Partner" É um modelo de franquia (tem valor); só "Partner" sozinho (sem o
+    "GS" na frente) é o modelo de parceria (de graça)."""
+    if deal_id:
+        nomes = [p.get('name') or '' for p in _fetch_deal_produtos(deal_id)]
+        if any(n.startswith('Franquia') for n in nomes):
+            return 'franquia'
+        if any(n == 'Contrato Partner' for n in nomes):
+            return 'partner'
+    modelo = (modelo_texto or '').strip().lower()
+    if not modelo:
         return None
-    nomes = [p.get('name') or '' for p in _fetch_deal_produtos(deal_id)]
-    if any(n.startswith('Franquia') for n in nomes):
-        return 'franquia'
-    if any(n == 'Contrato Partner' for n in nomes):
-        return 'partner'
-    return None
+    return 'partner' if modelo == 'partner' else 'franquia'
 
 
 print('-> Baixando planilha de previsão (CSV)...')
@@ -189,7 +195,7 @@ for _, r in df.iterrows():
         # Partner/GS Black) — não indica se é o "Contrato Partner" de graça, então
         # classifica pelo produto de verdade vinculado no Pipedrive (mesma lógica dos
         # contratos fechados).
-        'tipo_contrato': _tipo_contrato(deal_id),
+        'tipo_contrato': _tipo_contrato(deal_id, r.get(col_modelo) if col_modelo else None),
         # Qual página (Inbound/Outbound/Rebarba) esse negócio previsto pertence —
         # normaliza maiúscula/minúscula ("INBOUND", "Rebarba" etc. já vêm misturados
         # na planilha) pra comparar sem erro (31/08/2026).

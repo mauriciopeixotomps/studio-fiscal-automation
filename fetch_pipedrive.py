@@ -432,6 +432,27 @@ def _classifica_produtos(produtos):
     return None
 
 
+# Fallback pro Modelo da planilha de Previsão quando o negócio não tem produto
+# vinculado no Pipedrive ainda — confirmado com o time (31/08/2026): "GS Partner"
+# é um modelo de FRANQUIA (tem valor), só "Partner" sozinho (sem "GS" na frente) é
+# o modelo de parceria (de graça). Só funciona se fetch_previsao.py já rodou antes
+# nesse ciclo (previsao.xlsx) — se não existir ainda, o fallback fica vazio.
+_modelo_por_deal = {}
+_previsao_path = os.path.join(OUT_DIR, 'previsao.xlsx')
+if os.path.exists(_previsao_path):
+    _prev = pd.read_excel(_previsao_path)
+    if 'deal_id' in _prev.columns and 'modelo' in _prev.columns:
+        for _, _r in _prev.dropna(subset=['deal_id']).iterrows():
+            _modelo_por_deal[int(_r['deal_id'])] = _r.get('modelo')
+
+
+def _tipo_por_modelo(deal_id):
+    modelo = str(_modelo_por_deal.get(deal_id) or '').strip().lower()
+    if not modelo:
+        return None
+    return 'partner' if modelo == 'partner' else 'franquia'
+
+
 produto_rows = []
 if len(df_deals) and won_no_mes_mask.any():
     deal_ids_contratos = df_deals.loc[won_no_mes_mask, 'deal_id'].tolist()
@@ -440,7 +461,7 @@ if len(df_deals) and won_no_mes_mask.any():
             produto_rows.append({
                 'deal_id': deal_id,
                 'produtos': ', '.join(p.get('name') or '' for p in produtos) or None,
-                'tipo_contrato': _classifica_produtos(produtos),
+                'tipo_contrato': _classifica_produtos(produtos) or _tipo_por_modelo(deal_id),
             })
     n_franquia = sum(1 for r in produto_rows if r['tipo_contrato'] == 'franquia')
     n_partner = sum(1 for r in produto_rows if r['tipo_contrato'] == 'partner')

@@ -170,9 +170,19 @@ _no_show_deal_ids = set(_no_show_p62['negocio_id'].dropna()) if not _no_show_p62
 
 agendadores_out = []
 for a in config.AGENDADORES:
+    # "Leads recebidos" = negócios do funil 62 que já têm esse agendador como dono,
+    # adicionados no mês — mesma definição de "Negócios iniciados" usada em todo o
+    # resto do painel. Antes contava a tarefa "1ª tentativa de contato" (uma etapa
+    # seguinte, criada só depois que alguém começa a trabalhar o lead) — o time
+    # confirmou que quer ver o negócio assim que ele entra no funil, não só quando
+    # essa tarefa aparece (01/09/2026).
     leads_n = 0
-    if not agendadores_leads.empty and 'agendador_nome' in agendadores_leads.columns:
-        leads_n = agendadores_leads.loc[agendadores_leads['agendador_nome'] == a['nome'], 'negocio_id'].nunique()
+    if not deals_p62.empty and 'owner_id' in deals_p62.columns and 'add_time' in deals_p62.columns:
+        _dd = deals_p62[deals_p62['owner_id'] == a['id']].copy()
+        _dd['add_time'] = pd.to_datetime(_dd['add_time'], errors='coerce').dt.date
+        leads_n = int(_dd['add_time'].apply(
+            lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END
+        ).sum())
     agendamento_deal_ids = set()
     if not agendadores_agendamentos.empty and 'agendador_nome' in agendadores_agendamentos.columns:
         agendamento_deal_ids = set(

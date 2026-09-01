@@ -163,6 +163,20 @@ PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA = 633
 PIPELINE_OUTBOUND_EVENTOS = 69
 PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS = 721
 
+# ============= HISTÓRICO DE MESES (menu "Histórico", 01/09/2026) =============
+# O link de "mês anterior" só dá pra andar um mês de cada vez — uma vez que um mês
+# congela, ele fica preso com o link que tinha quando era o mês atual (ex:
+# agosto-2026.html aponta "← Ver mês atual", nunca ganhou um link pra trás porque só
+# apontava pra frente enquanto era o mês corrente). O time pediu pra sempre ter TODO
+# o histórico à mão, não só o mês anterior — por isso um índice completo (mês inicial
+# de cada funil até o mês atual), gerado em build_dashboard.py e mostrado num menu
+# "Histórico" em todas as páginas (atuais e futuras). Datas de início diferentes
+# porque Rebarba só passou a existir como página em 29/08/2026 — Inbound/Outbound são
+# rastreados desde julho.
+HISTORICO_INICIO_INBOUND = (2026, 7)
+HISTORICO_INICIO_OUTBOUND = (2026, 7)
+HISTORICO_INICIO_REBARBA = (2026, 8)
+
 # Domínio Pipedrive da conta — usado pra montar link direto pro negócio (ex: nas FPQs recebidas)
 PIPEDRIVE_DOMAIN = 'grupostudioexp.pipedrive.com'
 

@@ -718,6 +718,31 @@ MES_ANTERIOR_ARQUIVO_OUTBOUND = _arquivo_mes(_prev_ano, _prev_mes, prefixo='outb
 MES_ANTERIOR_ARQUIVO_REBARBA = _arquivo_mes(_prev_ano, _prev_mes, prefixo='rebarba')
 MES_ANTERIOR_LABEL = f'Ver {_MES_NOMES[_prev_mes].capitalize()} (fechado) →'
 
+
+def _historico(inicio, prefixo, url_atual):
+    """Lista TODOS os meses de `inicio` (ano, mes) até o mês corrente — não só o
+    anterior. Mês corrente aponta pro arquivo "vivo" (index.html/outbound.html/
+    rebarba.html); os passados apontam pro arquivo congelado de cada um. Mais
+    recente primeiro (fica no topo do menu "Histórico")."""
+    itens = []
+    ano, mes = inicio
+    while (ano, mes) <= (_cur_ano, _cur_mes):
+        label = f'{_MES_NOMES[mes].capitalize()} {ano}'
+        if (ano, mes) == (_cur_ano, _cur_mes):
+            itens.append({'url': url_atual, 'label': label + ' (atual)'})
+        else:
+            itens.append({'url': _arquivo_mes(ano, mes, prefixo=prefixo), 'label': label})
+        mes += 1
+        if mes > 12:
+            mes = 1
+            ano += 1
+    return list(reversed(itens))
+
+
+HISTORICO_INBOUND = _historico(config.HISTORICO_INICIO_INBOUND, None, 'index.html')
+HISTORICO_OUTBOUND = _historico(config.HISTORICO_INICIO_OUTBOUND, 'outbound', 'outbound.html')
+HISTORICO_REBARBA = _historico(config.HISTORICO_INICIO_REBARBA, 'rebarba', 'rebarba.html')
+
 PAGINAS_IRMAS = {
     'inbound': {'url': 'index.html', 'label': 'Studio Fiscal (Inbound)'},
     'outbound': {'url': 'outbound.html', 'label': 'Outbound'},
@@ -736,6 +761,7 @@ dashboard_inbound = {
     'agendadores_meta': agendadores_meta,
     'pagina_titulo': 'Equipe de Vendas — Studio Fiscal',
     'paginas_irmas': _paginas_irmas('inbound'),
+    'historico': HISTORICO_INBOUND,
     'mes_outro_url': MES_ANTERIOR_ARQUIVO,
     'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
@@ -765,6 +791,7 @@ dashboard_outbound = {
     **outbound_data,
     'pagina_titulo': 'Equipe de Vendas — Outbound',
     'paginas_irmas': _paginas_irmas('outbound'),
+    'historico': HISTORICO_OUTBOUND,
     'mes_outro_url': MES_ANTERIOR_ARQUIVO_OUTBOUND,
     'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos nos funis Outbound + Eventos da Studio Fiscal no mês',
@@ -796,6 +823,7 @@ dashboard_rebarba = {
     **rebarba_data,
     'pagina_titulo': 'Equipe de Vendas — Rebarba (reativação)',
     'paginas_irmas': _paginas_irmas('rebarba'),
+    'historico': HISTORICO_REBARBA,
     'mes_outro_url': MES_ANTERIOR_ARQUIVO_REBARBA,
     'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Rebarba Studio Fiscal Franquia no mês',

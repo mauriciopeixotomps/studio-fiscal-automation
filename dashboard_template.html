@@ -40,6 +40,10 @@
     background: var(--card-hi); border: 1px solid var(--border); color: var(--accent);
     font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px; text-decoration: none;
   }
+  #historico-select {
+    background: var(--card-hi); border: 1px solid var(--border); color: var(--accent);
+    font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  }
   .page-nav-link:hover { border-color: var(--accent); }
   .card {
     background: var(--card);
@@ -272,7 +276,7 @@
     @page { size: A4 landscape; margin: 4mm; }
     * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
     html, body { background: var(--bg) !important; }
-    .page-nav-link, .export-btn, #month-nav-link, #paginas-irmas-nav { display: none !important; }
+    .page-nav-link, .export-btn, #month-nav-link, #paginas-irmas-nav, #historico-select { display: none !important; }
     body { padding: 6px; }
     .card { margin-bottom: 10px; padding: 12px; }
     .pace-card, .score-item, .compare-card, .meta-block, .kpi, .rk-row, .relatorio-card {
@@ -296,6 +300,8 @@
     <div style="display:flex; gap:8px; flex-wrap:wrap;">
       <a class="page-nav-link" id="month-nav-link" href="#" style="display:none;"></a>
       <div id="paginas-irmas-nav" style="display:flex; gap:8px; flex-wrap:wrap;"></div>
+      <select id="historico-select" style="display:none;"></select>
+      <a class="page-nav-link" href="personalizado.html">📅 Período personalizado</a>
       <button class="export-btn" id="export-pdf-btn" title="Abre a caixa de impressão do navegador — escolha 'Salvar como PDF'">🖨 Exportar PDF</button>
       <button class="export-btn" id="export-image-btn" title="Baixa a página inteira como imagem PNG">📷 Exportar imagem</button>
     </div>
@@ -515,6 +521,13 @@ document.getElementById('relatorio-hint').textContent = D.relatorio_hint;
 document.getElementById('paginas-irmas-nav').innerHTML = (D.paginas_irmas || []).map(p =>
   `<a class="page-nav-link" href="${p.url}">${p.label} →</a>`
 ).join('');
+if (D.historico && D.historico.length) {
+  const sel = document.getElementById('historico-select');
+  sel.innerHTML = '<option value="">📁 Histórico</option>' +
+    D.historico.map(h => `<option value="${h.url}">${h.label}</option>`).join('');
+  sel.addEventListener('change', () => { if (sel.value) location.href = sel.value; });
+  sel.style.display = '';
+}
 if (D.mes_outro_url) {
   const monthNav = document.getElementById('month-nav-link');
   monthNav.href = D.mes_outro_url;

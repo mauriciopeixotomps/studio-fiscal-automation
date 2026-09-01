@@ -535,7 +535,12 @@ if (D.mes_outro_url) {
   monthNav.style.display = '';
 }
 if (!D.tem_meta) {
-  ['card-placar', 'card-metas', 'card-ritmo', 'card-previsao'].forEach(id => {
+  // "Placar do mês" e "Previsão" não dependem de meta nenhuma (Realizado é direto
+  // do Pipedrive, Previsto vem da planilha) — só "Metas do mês" e "Ritmo por
+  // indicador" de fato precisam de um número de meta pra ter sentido (barra de
+  // progresso, linha ideal). Escondia os 4 juntos antes, e um contrato fechado de
+  // verdade na Rebarba ficava invisível por causa disso (01/09/2026).
+  ['card-metas', 'card-ritmo'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
   });
@@ -1220,9 +1225,19 @@ function previsaoTotalRowHtml(label, rows) {
 }
 const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente');
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
+// Uma linha "Total {Funil}" por funil presente — só faz sentido quando a lista
+// junta mais de um (Inbound a partir de 01/09/2026); nas páginas que só têm o
+// próprio funil (Outbound/Rebarba) isso dá 1 funil só, igual ao "Total geral",
+// então nem aparece.
+const funisPresentes = [...new Set(D.previsao.map(r => r.funil).filter(Boolean))];
+const linhasPorFunil = funisPresentes.length > 1 ? funisPresentes.map(f => {
+  const nome = f.charAt(0) + f.slice(1).toLowerCase();
+  return previsaoTotalRowHtml(`Total ${nome}`, D.previsao.filter(r => r.funil === f));
+}).join('') : '';
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
   previsaoTotalRowHtml('Total geral', D.previsao) +
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
+  linhasPorFunil +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner)
 ) : '';
 

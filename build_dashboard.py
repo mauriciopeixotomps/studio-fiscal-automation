@@ -214,7 +214,8 @@ agendadores_meta = {
 }
 
 
-def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta, funil_nome):
+def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta, funil_nome,
+                scoreboard_pipeline_ids=None, previsao_todos_funis=False):
     """Monta o dict de dados de UMA página (inbound, outbound, rebarba...), filtrando
     CC1/CC2/CC3/FPQ pelo pipeline_id do negócio vinculado — pra não misturar atividade
     de um funil no número do outro. pipeline_ids é uma lista pra dar pra juntar mais de
@@ -240,6 +241,16 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     no_show_p = pf(no_show_re)
     deals_pipe = (
         deals[deals['pipeline_id'].isin(pipeline_ids)].copy()
+        if not deals.empty and 'pipeline_id' in deals.columns else deals.iloc[0:0]
+    )
+    # Escopo à parte só pro Placar do mês (Realizado) — o Inbound passa a somar
+    # Ganho dos 4 pipelines da Fiscal juntos (01/09/2026, o time quer ver todo
+    # fechamento — inclusive Rebarba/Outbound — no painel principal), enquanto
+    # Metas/Consolidado/Comparativo/Relatório continuam só do pipeline dessa
+    # página (senão um contrato da Rebarba contaria em dois lugares diferentes).
+    _scoreboard_pipeline_ids = scoreboard_pipeline_ids or pipeline_ids
+    deals_pipe_scoreboard = (
+        deals[deals['pipeline_id'].isin(_scoreboard_pipeline_ids)].copy()
         if not deals.empty and 'pipeline_id' in deals.columns else deals.iloc[0:0]
     )
 
@@ -581,20 +592,22 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
             })
 
     # ============= PLACAR DO MÊS — "Realizado" direto do Pipedrive =============
-    # Mesmo escopo do "Contratos fechados" do Metas do mês (Ganho, won_time no mês
-    # corrente, negócio desse pipeline, excluídos os de config.DEALS_EXCLUIDOS) —
-    # não depende mais de alguém preencher a planilha com o link certo.
-    dw = deals_pipe[deals_pipe['status'] == 'won'].copy() if not deals_pipe.empty else deals_pipe
+    # Ganho, won_time no mês corrente, excluídos os de config.DEALS_EXCLUIDOS —
+    # não depende mais de alguém preencher a planilha com o link certo. Usa
+    # deals_pipe_scoreboard (não deals_pipe) pra poder somar mais de um pipeline
+    # aqui sem misturar com o resto da página (ver comentário acima).
+    dw = deals_pipe_scoreboard[deals_pipe_scoreboard['status'] == 'won'].copy() if not deals_pipe_scoreboard.empty else deals_pipe_scoreboard
     if not dw.empty:
         dw['won_time'] = pd.to_datetime(dw['won_time'], errors='coerce')
         dw = dw[(dw['won_time'].dt.date >= config.MONTH_START) & (dw['won_time'].dt.date <= config.MONTH_END)]
 
-    # "Previsto" agora é filtrado pela coluna FUNIL da planilha (Inbound/Outbound/
-    # Rebarba) — cada página só vê os negócios previstos do próprio funil, em vez
-    # da mesma lista repetida nas três (31/08/2026, coluna adicionada pelo time).
-    # Linha sem FUNIL preenchido não aparece em nenhuma página (não dá pra saber
-    # de qual é) até alguém preencher.
-    previsao_funil = [r for r in previsao_out if r.get('funil') == funil_nome]
+    # "Previsto" é filtrado pela coluna FUNIL da planilha (Inbound/Outbound/Rebarba)
+    # — cada página só vê os negócios previstos do próprio funil (31/08/2026),
+    # EXCETO o Inbound, que a partir de 01/09/2026 mostra a lista inteira (todos os
+    # funis juntos) com o rodapé quebrando por funil — é o painel principal, o time
+    # quer ver tudo ali. Linha sem FUNIL preenchido não aparece em nenhuma página
+    # (não dá pra saber de qual é) até alguém preencher.
+    previsao_funil = previsao_out if previsao_todos_funis else [r for r in previsao_out if r.get('funil') == funil_nome]
     previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won']
     scoreboard_previsto = {
         'contratos_previstos': len(previsao_pendente),
@@ -641,6 +654,17 @@ inbound_data = build_page(
     meta_contratos_val=metas['meta_contratos'],
     tem_meta=True,
     funil_nome='INBOUND',
+    # Pedido do time (01/09/2026): o Inbound é o painel principal, então o Placar
+    # do mês (Realizado) soma Ganho dos 4 pipelines da Fiscal juntos — Inbound,
+    # Rebarba e os dois de Outbound — não só o 62. A Previsão também mostra a
+    # lista inteira (todos os funis), com o rodapé quebrando por funil.
+    scoreboard_pipeline_ids=[
+        config.PIPELINE_STUDIO_FISCAL_FRANQUIA,
+        config.PIPELINE_REBARBA_STUDIO_FISCAL,
+        config.PIPELINE_OUTBOUND_STUDIO_FISCAL,
+        config.PIPELINE_OUTBOUND_EVENTOS,
+    ],
+    previsao_todos_funis=True,
 )
 # "Consolidado do time" (Inbound) ganha 2 etapas antes da CC1 — Leads iniciados (já
 # calculado acima) e Leads qualificados (atividade Qualificação Realizada, feita pelo

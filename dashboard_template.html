@@ -463,7 +463,7 @@
       <table id="previsao-table">
         <thead>
           <tr>
-            <th>Data registro</th><th>Closer</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th>
+            <th>Data registro</th><th>Closer</th><th>Funil</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th>
             <th>Venda</th><th>Caixa</th><th>Fechamento esperado</th><th>Status</th>
             <th>Venda realizada</th><th>Caixa realizado</th><th>Deal</th>
           </tr>
@@ -1182,6 +1182,7 @@ tbody.innerHTML = D.previsao.map(r => `
   <tr>
     <td>${fmtDate(r.data_registro)}</td>
     <td>${r.closer || '—'}</td>
+    <td>${r.funil ? r.funil.charAt(0) + r.funil.slice(1).toLowerCase() : '—'}</td>
     <td>${r.lead || '—'}</td>
     <td>${r.modelo || '—'}</td>
     <td>${r.bandeira || '—'}</td>
@@ -1209,11 +1210,23 @@ function previsaoSomar(rows) {
     return acc;
   }, { venda: 0, caixa: 0, venda_realizada: 0, caixa_realizado: 0 });
 }
-function previsaoTotalRowHtml(label, rows) {
+// Conta quantos negócios tem cada valor de Confiança (a "temperatura" do lead:
+// Quente/Morno/Frio/Ganho/Perdido...), pra mostrar junto do "Total geral".
+function porTemperaturaTxt(rows) {
+  const contagem = {};
+  rows.forEach(r => {
+    const v = (r.confianca || '').toString().trim();
+    if (!v) return;
+    contagem[v] = (contagem[v] || 0) + 1;
+  });
+  return Object.entries(contagem).map(([k, n]) => `${n} ${k.charAt(0) + k.slice(1).toLowerCase()}`).join(' · ');
+}
+function previsaoTotalRowHtml(label, rows, comTemperatura) {
   const t = previsaoSomar(rows);
+  const temp = comTemperatura ? porTemperaturaTxt(rows) : '';
   return `
     <tr class="relatorio-total">
-      <td colspan="6">${label} (${rows.length} negócio${rows.length === 1 ? '' : 's'})</td>
+      <td colspan="7">${label} (${rows.length} negócio${rows.length === 1 ? '' : 's'})${temp ? ' — ' + temp : ''}</td>
       <td>${fmtMoney(t.venda)}</td>
       <td>${fmtMoney(t.caixa)}</td>
       <td></td>
@@ -1235,10 +1248,10 @@ const linhasPorFunil = funisPresentes.length > 1 ? funisPresentes.map(f => {
   return previsaoTotalRowHtml(`Total ${nome}`, D.previsao.filter(r => r.funil === f));
 }).join('') : '';
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
-  previsaoTotalRowHtml('Total geral', D.previsao) +
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
   linhasPorFunil +
-  previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner)
+  previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +
+  previsaoTotalRowHtml('Total geral', D.previsao, true)
 ) : '';
 
 // ===== Time de agendamento (SDRs dedicados) =====

@@ -614,11 +614,23 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),
         'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_pendente),
     }
+    # Franquia (tem valor) x Partner (de graça) dentro do mesmo "Contratos
+    # fechados" do Placar — mesma classificação (produto do Pipedrive, com
+    # fallback pro Modelo da planilha) já usada no Relatório por closer
+    # (01/09/2026, pedido do time: ver de cara quantos são franquia x parceria).
+    dw_franquia = dw[dw['tipo_contrato'] == 'franquia'] if not dw.empty and 'tipo_contrato' in dw.columns else dw.iloc[0:0]
+    dw_partner = dw[dw['tipo_contrato'] == 'partner'] if not dw.empty and 'tipo_contrato' in dw.columns else dw.iloc[0:0]
     scoreboard = {
         **scoreboard_previsto,
         'contratos_fechados': int(len(dw)),
+        'contratos_fechados_franquia': int(len(dw_franquia)),
+        'contratos_fechados_partner': int(len(dw_partner)),
         'venda_realizada_total': float(dw['valor'].fillna(0).sum()) if not dw.empty else 0.0,
+        'venda_realizada_franquia': float(dw_franquia['valor'].fillna(0).sum()) if not dw_franquia.empty else 0.0,
+        'venda_realizada_partner': float(dw_partner['valor'].fillna(0).sum()) if not dw_partner.empty else 0.0,
         'caixa_realizado_total': float(dw['caixa'].fillna(0).sum()) if not dw.empty else 0.0,
+        'caixa_realizado_franquia': float(dw_franquia['caixa'].fillna(0).sum()) if not dw_franquia.empty else 0.0,
+        'caixa_realizado_partner': float(dw_partner['caixa'].fillna(0).sum()) if not dw_partner.empty else 0.0,
     }
 
     return {

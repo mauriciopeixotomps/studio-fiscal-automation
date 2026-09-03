@@ -314,16 +314,19 @@
         <div class="lbl">Contratos fechados</div>
         <div class="val" id="score-contratos">0</div>
         <div class="score-sub" id="score-contratos-sub"></div>
+        <div class="score-sub" id="score-contratos-tipo"></div>
       </div>
       <div class="score-item accent">
         <div class="lbl">Venda realizada</div>
         <div class="val" id="score-venda">R$ 0</div>
         <div class="score-sub" id="score-venda-sub"></div>
+        <div class="score-sub" id="score-venda-tipo"></div>
       </div>
       <div class="score-item orange">
         <div class="lbl">Caixa realizado</div>
         <div class="val" id="score-caixa">R$ 0</div>
         <div class="score-sub" id="score-caixa-sub"></div>
+        <div class="score-sub" id="score-caixa-tipo"></div>
       </div>
     </div>
   </div>
@@ -620,6 +623,19 @@ document.getElementById('score-venda-sub').innerHTML =
   scoreSubHtml(D.scoreboard.venda_prevista_total, D.scoreboard.venda_realizada_total, fmtMoney);
 document.getElementById('score-caixa-sub').innerHTML =
   scoreSubHtml(D.scoreboard.caixa_prevista_total, D.scoreboard.caixa_realizado_total, fmtMoney);
+
+// Franquia (tem valor) x Partner (grátis) dentro do "Contratos fechados" —
+// só aparece se já tiver algum contrato fechado no mês (evita "0 · 0" à toa).
+function tipoContratoTxt(franquia, partner, fmt) {
+  if (!franquia && !partner) return '';
+  return `${fmt(franquia)} Franquia · ${fmt(partner)} Partner`;
+}
+document.getElementById('score-contratos-tipo').textContent =
+  tipoContratoTxt(D.scoreboard.contratos_fechados_franquia, D.scoreboard.contratos_fechados_partner, v => v);
+document.getElementById('score-venda-tipo').textContent =
+  tipoContratoTxt(D.scoreboard.venda_realizada_franquia, D.scoreboard.venda_realizada_partner, fmtMoney);
+document.getElementById('score-caixa-tipo').textContent =
+  tipoContratoTxt(D.scoreboard.caixa_realizado_franquia, D.scoreboard.caixa_realizado_partner, fmtMoney);
 
 // ===== Datas do mês (usado pelo pace e pelos gráficos) =====
 const MONTH_DATES = (function() {

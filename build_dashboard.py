@@ -42,6 +42,7 @@ deals_p69 = load('deals_pipeline69.xlsx')  # OUTBOUND - EVENTOS (reportado junto
 deals_produtos = load('deals_produtos.xlsx')  # tipo_contrato: 'franquia' (tem valor) / 'partner' (de graça)
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
+deals_agendadores = load('deals_agendadores.xlsx')  # negócio do agendador em QUALQUER pipeline
 agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
 qualificacao_re = load('activities_qualificacao_realizada.xlsx')
 no_show_re = load('activities_no_show.xlsx')
@@ -170,15 +171,16 @@ _no_show_deal_ids = set(_no_show_p62['negocio_id'].dropna()) if not _no_show_p62
 
 agendadores_out = []
 for a in config.AGENDADORES:
-    # "Leads recebidos" = negócios do funil 62 que já têm esse agendador como dono,
-    # adicionados no mês — mesma definição de "Negócios iniciados" usada em todo o
-    # resto do painel. Antes contava a tarefa "1ª tentativa de contato" (uma etapa
-    # seguinte, criada só depois que alguém começa a trabalhar o lead) — o time
-    # confirmou que quer ver o negócio assim que ele entra no funil, não só quando
-    # essa tarefa aparece (01/09/2026).
+    # "Leads recebidos" = TODO negócio que já tem esse agendador como dono, em
+    # QUALQUER pipeline (não só o 62/Studio Fiscal) — adicionado no mês. Antes
+    # contava só o funil 62 (01/09/2026), mas o time confirmou que o SDR pode
+    # receber lead que ainda não foi roteado pro funil da Fiscal (ex: ainda numa
+    # etapa de qualificação compartilhada como a FRANQUIA/42) e isso tem que
+    # contar igual (03/09/2026) — antes disso contava a tarefa "1ª tentativa de
+    # contato" (uma etapa seguinte, só depois de alguém começar a trabalhar).
     leads_n = 0
-    if not deals_p62.empty and 'owner_id' in deals_p62.columns and 'add_time' in deals_p62.columns:
-        _dd = deals_p62[deals_p62['owner_id'] == a['id']].copy()
+    if not deals_agendadores.empty and 'agendador_id' in deals_agendadores.columns and 'add_time' in deals_agendadores.columns:
+        _dd = deals_agendadores[deals_agendadores['agendador_id'] == a['id']].copy()
         _dd['add_time'] = pd.to_datetime(_dd['add_time'], errors='coerce').dt.date
         leads_n = int(_dd['add_time'].apply(
             lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END

@@ -397,6 +397,35 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
 
 df_deals = pd.DataFrame(deals_rows)
 df_deals.to_excel(os.path.join(OUT_DIR, 'deals.xlsx'), index=False)
+
+# ============= DEALS DOS AGENDADORES (leads recebidos, TODO pipeline) =============
+# "Leads recebidos" do agendador conta negócio dele em QUALQUER funil, não só o 62
+# (Studio Fiscal Franquia) — o time confirmou que o SDR pode receber lead que ainda
+# não foi roteado pro funil da Fiscal (ex: ainda na FRANQUIA/42 compartilhada) e
+# isso tem que contar igual (03/09/2026). Só os campos que interessam pra contar.
+print('-> Fetching deals dos agendadores (todo pipeline)...')
+
+
+def _fetch_deals_agendador(agendador_id):
+    rows = fetch_all('deals', {'user_id': agendador_id})
+    return agendador_id, rows
+
+
+agendadores_deals_rows = []
+with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+    futures = [executor.submit(_fetch_deals_agendador, aid) for aid in config.AGENDADOR_IDS]
+    for f in concurrent.futures.as_completed(futures):
+        agendador_id, rows = f.result()
+        print(f'   {AGENDADOR_NOME.get(agendador_id)}: {len(rows)} deals (todo pipeline)')
+        for d in rows:
+            agendadores_deals_rows.append({
+                'deal_id': d.get('id'),
+                'agendador_id': agendador_id,
+                'agendador_nome': AGENDADOR_NOME.get(agendador_id),
+                'pipeline_id': d.get('pipeline_id'),
+                'add_time': _fix_dt(d.get('add_time')),
+            })
+pd.DataFrame(agendadores_deals_rows).to_excel(os.path.join(OUT_DIR, 'deals_agendadores.xlsx'), index=False)
 n_leads = df_deals['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_deals) else 0
 won_no_mes_mask = (df_deals['status'] == 'won') & df_deals['won_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)) if len(df_deals) else pd.Series(dtype=bool)
 n_contratos = won_no_mes_mask.sum() if len(df_deals) else 0

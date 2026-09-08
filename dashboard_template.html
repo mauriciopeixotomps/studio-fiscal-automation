@@ -805,6 +805,7 @@ document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => 
 `;
 }).join('');
 
+const paceCharts = [];
 Object.keys(D.pace).forEach(key => {
   const p = D.pace[key];
   const color = PACE_COLORS[key] || '#d5ae77';
@@ -816,7 +817,7 @@ Object.keys(D.pace).forEach(key => {
   if (p.meta) {
     datasets.push({ label: 'Ideal', data: ideal, borderColor: '#a8a29b', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
   }
-  new Chart(document.getElementById(`pace-canvas-${key}`), {
+  paceCharts.push(new Chart(document.getElementById(`pace-canvas-${key}`), {
     type: 'line',
     data: { labels: paceLabels, datasets },
     plugins: [todayLinePlugin],
@@ -829,8 +830,18 @@ Object.keys(D.pace).forEach(key => {
         y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
       }
     }
-  });
+  }));
 });
+// Os gráficos (Chart.js, responsive:true) têm um ResizeObserver que redesenha
+// o canvas quando a largura do container muda — o que acontece bem na hora
+// de entrar em @media print (papel A4 paisagem tem uma largura de conteúdo
+// diferente da tela). Esse redesenho é assíncrono e podia terminar DEPOIS do
+// Chrome já ter calculado quantas páginas o PDF tem, mudando a altura de
+// alguns cards tarde demais — o conteúdo que sobrava no fim do documento
+// (ex.: FPQs recebidas) era simplesmente descartado em vez de virar uma nova
+// página. Corrigido: força o resize/redraw de todo gráfico de forma síncrona
+// assim que o navegador avisa que vai imprimir, ANTES da paginação rodar.
+window.addEventListener('beforeprint', () => { paceCharts.forEach(c => c.resize()); });
 
 // ===== Funil (consolidado e por closer) =====
 function convPct(val, base) {

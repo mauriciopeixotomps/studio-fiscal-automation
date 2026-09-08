@@ -286,6 +286,20 @@
       max-height: none !important; overflow: visible !important;
     }
     .relatorio-table-wrap table th, .relatorio-table-wrap table td { white-space: normal !important; }
+    /* 3º ajuste (08/09/2026): dois problemas achados no PDF real exportado —
+       (1) título de seção (h2) ficando sozinho no fim de uma página, com o
+       conteúdo dele só começando na página seguinte ("Comparativo entre
+       closers", "Relatório por closer" etc. cortados do corpo). Corrigido
+       evitando quebra logo depois do título/toolbar.
+       (2) a linha "Mapa de calor" + "FPQs recebidas" (.card-row, os dois
+       lado a lado com display:flex) sendo CORTADA no fim da última página
+       em vez de continuar numa página nova — flexbox não sabe fragmentar
+       conteúdo entre páginas de impressão, o navegador simplesmente descarta
+       o que não coube. Corrigido virando bloco empilhado só na impressão,
+       que aí flui e pagina normalmente como o resto do site. */
+    .card > h2, .relatorio-toolbar { break-after: avoid; page-break-after: avoid; }
+    .card-row { display: block; }
+    .card-row .card { width: 100%; }
   }
 </style>
 </head>

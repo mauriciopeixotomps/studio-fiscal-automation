@@ -382,6 +382,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         closer_id, rows = f.result()
         print(f'   {CLOSER_NAME.get(closer_id)}: {len(rows)} deals')
         for d in rows:
+            pessoa = d.get('person_id')
             deals_rows.append({
                 'deal_id': d.get('id'),
                 'titulo': d.get('title'),
@@ -393,6 +394,13 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'caixa': d.get(config.CF_CAIXA),
                 'add_time': _fix_dt(d.get('add_time')),
                 'won_time': _fix_dt(d.get('won_time')),
+                # Campos usados só pelo sync automático da planilha de Previsão
+                # (sync_previsao_auto_add.py, 09/09/2026) — "Data de fechamento
+                # esperada" é campo nativo do negócio; "pessoa_nome" é o contato
+                # vinculado (o que a planilha chama de "Lead"), vem aninhado no
+                # payload do negócio (person_id.name), não achatado pela API v1.
+                'expected_close_date': d.get('expected_close_date'),
+                'pessoa_nome': pessoa.get('name') if isinstance(pessoa, dict) else None,
             })
 
 df_deals = pd.DataFrame(deals_rows)

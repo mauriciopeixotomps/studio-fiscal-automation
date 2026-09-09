@@ -12,6 +12,7 @@ jobs:
     env:
       PIPEDRIVE_TOKEN: ${{ secrets.PIPEDRIVE_TOKEN }}
       GITHUB_DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+      GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
     steps:
       - uses: actions/checkout@v4
 
@@ -24,6 +25,10 @@ jobs:
 
       - name: Fetch Pipedrive
         run: python fetch_pipedrive.py
+
+      - name: Sync automático da Previsão (produto + valor + data esperada -> linha na planilha)
+        run: python sync_previsao_auto_add.py
+        continue-on-error: true  # não-fatal de propósito — sem credencial ainda, ou falha da API do Sheets, não deve travar o resto do ciclo
 
       - name: Fetch previsão (planilha)
         run: python fetch_previsao.py

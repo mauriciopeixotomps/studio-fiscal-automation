@@ -237,3 +237,23 @@ METAS_FILE = f'metas_{_today.year}_{_today.month:02d}.json'
 # ============= PLANILHA DE PREVISÃO (Google Sheets) =============
 PREVISAO_SHEET_ID = '1PJrFhbCAEkcLYeWH0MvRujkWQqpUl9AM0Nwrc2cgYcM'
 PREVISAO_CSV_URL = f'https://docs.google.com/spreadsheets/d/{PREVISAO_SHEET_ID}/export?format=csv&gid=0'
+
+# ============= SYNC AUTOMÁTICO DA PREVISÃO (grava direto na planilha, 09/09/2026) =============
+# Pedido do time: quando um negócio ganha Produto + Valor + Data de fechamento
+# esperada no Pipedrive, ele entra sozinho na planilha de Previsão (ver
+# sync_previsao_auto_add.py) em vez de depender de alguém digitar à mão.
+# Credencial: JSON de conta de serviço do Google, com permissão de Editor na
+# planilha acima — local em .google_service_account.json (git-ignorado) ou via
+# env var GOOGLE_SERVICE_ACCOUNT_JSON (GitHub Actions). Ver
+# GOOGLE_SERVICE_ACCOUNT_SETUP.md pra como criar.
+GOOGLE_SERVICE_ACCOUNT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.google_service_account.json')
+
+# Qual FUNIL (mesma coluna da planilha) cada pipeline representa — os 4
+# pipelines da Fiscal que já alimentam Placar/Previsão do Inbound (ver
+# build_dashboard.py, scoreboard_pipeline_ids).
+FUNIL_POR_PIPELINE = {
+    PIPELINE_STUDIO_FISCAL_FRANQUIA: 'INBOUND',
+    PIPELINE_REBARBA_STUDIO_FISCAL: 'REBARBA',
+    PIPELINE_OUTBOUND_STUDIO_FISCAL: 'OUTBOUND',
+    PIPELINE_OUTBOUND_EVENTOS: 'OUTBOUND',
+}

@@ -143,8 +143,11 @@ header = [c.strip() for c in existing[header_row_idx]]
 col_link = next((i for i, c in enumerate(header) if c.lower().startswith('link do pipe')), None)
 if col_link is None:
     _pular('não achei a coluna "Link do pipe" na planilha')
+col_satus = next((i for i, c in enumerate(header) if c.lower().startswith('satus') or c.lower().startswith('status')), None)
+col_confianca = next((i for i, c in enumerate(header) if c.lower().startswith('confian')), None)
 
 deal_ids_existentes = set()
+linhas_auto = []  # (linha 1-based, deal_id) das linhas que ESTE script já criou (Satus começa com "Novo (auto)")
 ultima_linha_com_dado = header_row_idx  # índice 0-based da última linha com Closer+Lead preenchidos
 for i in range(header_row_idx + 1, len(existing)):
     row = existing[i]
@@ -156,8 +159,11 @@ for i in range(header_row_idx + 1, len(existing)):
     lead_cell = row[2] if len(row) > 2 else ''
     if (closer_cell or '').strip() and (lead_cell or '').strip():
         ultima_linha_com_dado = i
+    satus_cell = row[col_satus] if col_satus is not None and col_satus < len(row) else ''
+    if m and (satus_cell or '').strip().startswith('Novo (auto)'):
+        linhas_auto.append((i + 1, int(m.group(1))))  # +1: gspread é 1-based
 
-print(f'   {len(deal_ids_existentes)} negócio(s) já na planilha')
+print(f'   {len(deal_ids_existentes)} negócio(s) já na planilha ({len(linhas_auto)} deles ainda "Novo (auto)")')
 
 # ============= 2) Candidatos no Pipedrive (aberto + valor + data esperada) =============
 deals_path = os.path.join(OUT_DIR, 'deals.xlsx')
@@ -165,8 +171,32 @@ if not os.path.exists(deals_path):
     _pular('data_pipedrive/deals.xlsx não existe ainda — rode fetch_pipedrive.py primeiro')
 
 df = pd.read_excel(deals_path)
+
+# ============= 1.5) Atualiza status das linhas que ESTE script já criou antes =============
+# Se um negócio que o robô adicionou (Satus = "Novo (auto)") virou Ganho ou
+# Perdido no Pipedrive depois, Confiança/Satus continuavam travados em
+# "Novo (auto)"/MORNO pra sempre — o time só percebia se abrisse o negócio à
+# mão. Corrigido (09/09/2026, caso real: Nilza foi marcada Perdida no funil e
+# a planilha continuou mostrando Morno). Só mexe em linha marcada "Novo
+# (auto)" — nunca em linha que o time já reclassificou/editou à mão.
+if linhas_auto and not df.empty and col_satus is not None and col_confianca is not None:
+    status_por_deal = dict(zip(df['deal_id'], df['status']))
+    for linha, deal_id in linhas_auto:
+        status_atual = status_por_deal.get(deal_id)
+        if status_atual == 'won':
+            nova_confianca, novo_satus = 'FECHADO', 'Ganho (auto)'
+        elif status_atual == 'lost':
+            nova_confianca, novo_satus = 'PERDIDO', 'Perdido (auto)'
+        else:
+            continue
+        col_satus_a1 = gspread.utils.rowcol_to_a1(linha, col_satus + 1)
+        col_confianca_a1 = gspread.utils.rowcol_to_a1(linha, col_confianca + 1)
+        ws.update_acell(col_satus_a1, novo_satus)
+        ws.update_acell(col_confianca_a1, nova_confianca)
+        print(f'   ~ linha {linha} (deal {deal_id}): Satus="{novo_satus}", Confiança={nova_confianca}')
+
 if df.empty or 'expected_close_date' not in df.columns:
-    print('-> Sync automático da Previsão: nenhum negócio pra checar (deals.xlsx sem expected_close_date — rode fetch_pipedrive.py atualizado).')
+    print('-> Sync automático da Previsão: nenhum negócio novo pra checar (deals.xlsx sem expected_close_date — rode fetch_pipedrive.py atualizado).')
     sys.exit(0)
 
 candidatos = df[

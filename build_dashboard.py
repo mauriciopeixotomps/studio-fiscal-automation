@@ -610,7 +610,10 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     # quer ver tudo ali. Linha sem FUNIL preenchido não aparece em nenhuma página
     # (não dá pra saber de qual é) até alguém preencher.
     previsao_funil = previsao_out if previsao_todos_funis else [r for r in previsao_out if r.get('funil') == funil_nome]
-    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won']
+    # Negócio Ganho OU Perdido não conta mais como "previsto" (mesma lógica do
+    # rodapé da tabela em dashboard_template.html) — um negócio morto não é
+    # mais uma previsão de venda futura (09/09/2026, caso real: Nilza).
+    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') not in ('won', 'lost')]
     scoreboard_previsto = {
         'contratos_previstos': len(previsao_pendente),
         'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),

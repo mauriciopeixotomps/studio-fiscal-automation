@@ -212,6 +212,7 @@
   tr:hover td { background: var(--card-hi); }
   .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; }
   .badge.won { background: rgba(34,197,94,.15); color: var(--green); }
+  .badge.lost { background: rgba(239,68,68,.15); color: var(--red); }
   .badge.open { background: rgba(148,163,184,.15); color: var(--text-dim); }
   .badge.confianca-confiante { background: rgba(34,197,94,.15); color: var(--green); }
   .badge.confianca-quente { background: rgba(213,174,119,.18); color: var(--accent); }
@@ -1231,7 +1232,7 @@ tbody.innerHTML = D.previsao.map(r => `
     <td>${fmtMoney(r.venda)}</td>
     <td>${fmtMoney(r.caixa)}</td>
     <td>${fmtDate(r.data_fechamento_esperada)}</td>
-    <td>${r.deal_status === 'won' ? '<span class="badge won">Ganho</span>' : (r.status || '—')}</td>
+    <td>${r.deal_status === 'won' ? '<span class="badge won">Ganho</span>' : r.deal_status === 'lost' ? '<span class="badge lost">Perdido</span>' : (r.status || '—')}</td>
     <td>${fmtMoney(r.venda_realizada)}</td>
     <td>${fmtMoney(r.caixa_realizado)}</td>
     <td>${r.deal_link && r.deal_link.startsWith('http') ? `<a class="link" href="${r.deal_link}" target="_blank">abrir</a>` : '—'}</td>
@@ -1241,8 +1242,11 @@ tbody.innerHTML = D.previsao.map(r => `
 function previsaoSomar(rows) {
   return rows.reduce((acc, r) => {
     // Negócio já Ganho não conta mais como "previsto" (venda/caixa) — já virou
-    // passado, e já está somado do lado do realizado logo abaixo.
-    if (r.deal_status !== 'won') {
+    // passado, e já está somado do lado do realizado logo abaixo. Negócio
+    // Perdido também sai da soma (09/09/2026, caso real: Nilza foi marcada
+    // Perdida no funil e o valor dela continuava inflando o "previsto" — um
+    // negócio morto não é mais uma previsão de venda futura).
+    if (r.deal_status !== 'won' && r.deal_status !== 'lost') {
       acc.venda += r.venda || 0;
       acc.caixa += r.caixa || 0;
     }

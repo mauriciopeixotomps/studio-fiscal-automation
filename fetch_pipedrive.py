@@ -401,6 +401,7 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 # payload do negócio (person_id.name), não achatado pela API v1.
                 'expected_close_date': d.get('expected_close_date'),
                 'pessoa_nome': pessoa.get('name') if isinstance(pessoa, dict) else None,
+                'stage_id': d.get('stage_id'),
             })
 
 df_deals = pd.DataFrame(deals_rows)

@@ -155,6 +155,15 @@ PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND = 695
 PIPELINE_REBARBA_STUDIO_FISCAL = 65
 PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA = 633
 
+# A 1ª etapa do funil Rebarba é literalmente "PERDIDO" (o negócio cai ali de
+# volta quando entra pra reativação) — por isso um negócio da Rebarba só entra
+# na planilha de Previsão automaticamente (sync_previsao_auto_add.py) se já
+# tiver avançado até "OPORTUNIDADE (FPQ RECEBIDA)" ou depois; antes disso o
+# valor/data esperada podem ser resquício do negócio antigo perdido, não um
+# closer de fato trabalhando a reativação (pedido do time, 09/09/2026 — caso
+# real: Nilza Bernardes ainda na 1ª etapa "PERDIDO", 623, não devia ter entrado).
+PIPELINE_STAGE_OPORTUNIDADE_REBARBA = 628
+
 # "OUTBOUND - EVENTOS" — outro motor de outbound (convite/parceria em eventos), sem
 # etiqueta de marca nenhuma (diferente do 62/65, que usam LABEL_STUDIO_FISCAL) — o
 # time confirmou que esse pipeline é 100% da Fiscal, conta tudo sem filtrar por dono

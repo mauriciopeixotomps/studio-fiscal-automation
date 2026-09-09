@@ -207,6 +207,13 @@ candidatos = df[
     & ~df['deal_id'].isin(deal_ids_existentes)
 ].copy()
 
+# A Rebarba começa numa etapa literalmente chamada "PERDIDO" (reativação de
+# negócio perdido) — valor/data esperada ali podem ser resquício do negócio
+# antigo, não o closer de fato trabalhando de novo. Só entra a partir de
+# "OPORTUNIDADE (FPQ RECEBIDA)" ou depois (pedido do time, 09/09/2026).
+_rebarba = candidatos['pipeline_id'] == config.PIPELINE_REBARBA_STUDIO_FISCAL
+candidatos = candidatos[~_rebarba | (candidatos['stage_id'] >= config.PIPELINE_STAGE_OPORTUNIDADE_REBARBA)]
+
 print(f'   {len(candidatos)} negócio(s) aberto(s) com valor + data esperada, ainda não na planilha (antes de checar produto vinculado)')
 
 # ============= 3) Confirma produto vinculado (o 3º critério pedido) e monta as linhas =============

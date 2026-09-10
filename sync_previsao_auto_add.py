@@ -109,6 +109,18 @@ def _modelo_from_produto(nome_produto):
     return n.upper()
 
 
+def _norm_nome(nome):
+    """Normaliza nome do lead pra comparar sem falso-negativo: minúsculo, sem
+    acento, espaços colapsados. Usado pra NÃO adicionar um lead que já consta
+    na planilha (mesmo que seja um negócio/deal_id diferente) — pedido do time
+    (10/09/2026, caso Nilza Bernardes, que já estava na planilha por um
+    negócio da Franquia e o robô ia colocar de novo por um da Rebarba)."""
+    import unicodedata
+    n = unicodedata.normalize('NFD', str(nome or ''))
+    n = ''.join(c for c in n if unicodedata.category(c) != 'Mn')
+    return ' '.join(n.lower().split())
+
+
 def _fmt_data_br(data_iso):
     if not data_iso or pd.isna(data_iso):
         return ''
@@ -146,7 +158,10 @@ if col_link is None:
 col_satus = next((i for i, c in enumerate(header) if c.lower().startswith('satus') or c.lower().startswith('status')), None)
 col_confianca = next((i for i, c in enumerate(header) if c.lower().startswith('confian')), None)
 
+col_lead = next((i for i, c in enumerate(header) if c.lower().startswith('lead')), 2)
+
 deal_ids_existentes = set()
+nomes_existentes = set()  # nomes de lead (normalizados) que já estão na planilha — não adiciona de novo, mesmo que seja outro negócio
 linhas_auto = []  # (linha 1-based, deal_id) das linhas que ESTE script já criou (Satus começa com "Novo (auto)")
 ultima_linha_com_dado = header_row_idx  # índice 0-based da última linha com Closer+Lead preenchidos
 for i in range(header_row_idx + 1, len(existing)):
@@ -156,14 +171,16 @@ for i in range(header_row_idx + 1, len(existing)):
     if m:
         deal_ids_existentes.add(int(m.group(1)))
     closer_cell = row[1] if len(row) > 1 else ''
-    lead_cell = row[2] if len(row) > 2 else ''
+    lead_cell = row[col_lead] if col_lead < len(row) else ''
+    if (lead_cell or '').strip():
+        nomes_existentes.add(_norm_nome(lead_cell))
     if (closer_cell or '').strip() and (lead_cell or '').strip():
         ultima_linha_com_dado = i
     satus_cell = row[col_satus] if col_satus is not None and col_satus < len(row) else ''
     if m and (satus_cell or '').strip().startswith('Novo (auto)'):
         linhas_auto.append((i + 1, int(m.group(1))))  # +1: gspread é 1-based
 
-print(f'   {len(deal_ids_existentes)} negócio(s) já na planilha ({len(linhas_auto)} deles ainda "Novo (auto)")')
+print(f'   {len(deal_ids_existentes)} negócio(s) / {len(nomes_existentes)} nome(s) já na planilha ({len(linhas_auto)} ainda "Novo (auto)")')
 
 # ============= 2) Candidatos no Pipedrive (aberto + valor + data esperada) =============
 deals_path = os.path.join(OUT_DIR, 'deals.xlsx')
@@ -214,6 +231,12 @@ candidatos = df[
 _rebarba = candidatos['pipeline_id'] == config.PIPELINE_REBARBA_STUDIO_FISCAL
 candidatos = candidatos[~_rebarba | (candidatos['stage_id'] >= config.PIPELINE_STAGE_OPORTUNIDADE_REBARBA)]
 
+# Se o NOME do lead já consta na planilha (por qualquer negócio, mesmo outro
+# deal_id / outro funil), não adiciona de novo — pedido do time (10/09/2026).
+if not candidatos.empty and nomes_existentes:
+    _nome_lead = candidatos.apply(lambda r: _norm_nome(r.get('pessoa_nome') or r.get('titulo') or ''), axis=1)
+    candidatos = candidatos[~_nome_lead.isin(nomes_existentes)]
+
 print(f'   {len(candidatos)} negócio(s) aberto(s) com valor + data esperada, ainda não na planilha (antes de checar produto vinculado)')
 
 # ============= 3) Confirma produto vinculado (o 3º critério pedido) e monta as linhas =============
@@ -252,17 +275,57 @@ if not novas_linhas:
     print('-> Sync automático da Previsão: nada novo pra adicionar (candidatos sem produto vinculado ainda).')
     sys.exit(0)
 
+# Dedup dentro do próprio lote — se o mesmo lead tiver 2 negócios abertos que
+# passaram por todos os filtros, entra 1 só (o 1º).
+_vistos, _dedup = set(), []
+for ln in novas_linhas:
+    chave = _norm_nome(ln[2])
+    if chave in _vistos:
+        continue
+    _vistos.add(chave)
+    _dedup.append(ln)
+novas_linhas = _dedup
+
 if len(novas_linhas) > MAX_NOVOS_POR_CICLO:
     print(f'   AVISO: {len(novas_linhas)} negócio(s) prontos pra entrar é mais que o esperado (trava em {MAX_NOVOS_POR_CICLO}) '
           f'— pulando esse ciclo pra não arriscar poluir a planilha. Confira manualmente.')
     sys.exit(0)
 
-# ============= 4) Escreve na planilha =============
+# ============= 4) Re-checa a planilha AGORA (o motor local e o da nuvem rodam
+# no mesmo horário — sem isso, os dois liam a planilha, viam o mesmo negócio
+# faltando e adicionavam a MESMA linha 2x; caso real 10/09/2026: Lourivelthon
+# Moreira Barros entrou duplicado) e escreve. =============
+_ex2 = ws.get_all_values()
+_hdr2 = next((i for i, r in enumerate(_ex2) if r and r[0].strip() == 'DATA DO REGISTRO'), header_row_idx)
+_ids2, _nomes2 = set(), set()
+_ultima2 = _hdr2
+for i in range(_hdr2 + 1, len(_ex2)):
+    r = _ex2[i]
+    mm = DEAL_LINK_RE.search(r[col_link] if col_link < len(r) else '')
+    if mm:
+        _ids2.add(int(mm.group(1)))
+    ld = r[col_lead] if col_lead < len(r) else ''
+    if (ld or '').strip():
+        _nomes2.add(_norm_nome(ld))
+    cl = r[1] if len(r) > 1 else ''
+    if (cl or '').strip() and (ld or '').strip():
+        _ultima2 = i
+
+# novas_linhas é sempre montada na ordem canônica: [0]=Data [2]=Lead [12]=Link
+novas_linhas = [
+    ln for ln in novas_linhas
+    if int(DEAL_LINK_RE.search(ln[12]).group(1)) not in _ids2
+    and _norm_nome(ln[2]) not in _nomes2
+]
+if not novas_linhas:
+    print('-> Sync automático da Previsão: outro ciclo já adicionou esses negócios nesse meio-tempo — nada a fazer.')
+    sys.exit(0)
+
 # Insere logo depois da última linha com dado (não usa "append" simples) —
 # empurra pra baixo o que tiver depois (linhas em branco, linha TOTAL com
 # fórmula de soma), igual um Inserir Linha manual faria. O Google Sheets
 # expande sozinho o range de uma SUM() que cobria a linha de cima/baixo do
 # ponto de inserção, então o TOTAL continua somando tudo certo.
-insert_at = ultima_linha_com_dado + 2  # +1 pra ir pra próxima linha, +1 pra converter índice 0-based -> linha 1-based do gspread
+insert_at = _ultima2 + 2  # +1 pra ir pra próxima linha, +1 pra converter índice 0-based -> linha 1-based do gspread
 ws.insert_rows(novas_linhas, row=insert_at, value_input_option='USER_ENTERED')
 print(f'-> Sync automático da Previsão: {len(novas_linhas)} linha(s) nova(s) adicionada(s) na planilha.')

@@ -111,14 +111,19 @@ def _modelo_from_produto(nome_produto):
 
 def _norm_nome(nome):
     """Normaliza nome do lead pra comparar sem falso-negativo: minúsculo, sem
-    acento, espaços colapsados. Usado pra NÃO adicionar um lead que já consta
-    na planilha (mesmo que seja um negócio/deal_id diferente) — pedido do time
-    (10/09/2026, caso Nilza Bernardes, que já estava na planilha por um
-    negócio da Franquia e o robô ia colocar de novo por um da Rebarba)."""
+    acento, espaços colapsados, E só primeiro + último nome (ignora nomes do
+    meio) — pra "Cyro Neto" casar com "Cyro Galvani Neto" (mesma pessoa, o time
+    digitou de um jeito na planilha e o Pipedrive tem de outro). Usado pra NÃO
+    adicionar um lead que já consta na planilha, mesmo que seja outro negócio /
+    outro deal_id / outro funil. Pedido do time (10/09/2026 — casos Nilza
+    Bernardes e Cyro Galvani Neto)."""
     import unicodedata
     n = unicodedata.normalize('NFD', str(nome or ''))
     n = ''.join(c for c in n if unicodedata.category(c) != 'Mn')
-    return ' '.join(n.lower().split())
+    toks = n.lower().split()
+    if not toks:
+        return ''
+    return toks[0] if len(toks) == 1 else f'{toks[0]} {toks[-1]}'
 
 
 def _fmt_data_br(data_iso):

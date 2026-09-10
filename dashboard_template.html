@@ -1239,14 +1239,18 @@ tbody.innerHTML = D.previsao.map(r => `
   </tr>
 `).join('');
 
+function previsaoPerdido(r) {
+  // "Perdido" = lost no Pipedrive OU o time marcou PERDIDO na Confiança
+  // (às vezes marca antes do Pipedrive, ou o negócio nem tem link válido).
+  return r.deal_status === 'lost' || /perdid/i.test((r.confianca || '').toString());
+}
 function previsaoSomar(rows) {
   return rows.reduce((acc, r) => {
-    // Negócio já Ganho não conta mais como "previsto" (venda/caixa) — já virou
-    // passado, e já está somado do lado do realizado logo abaixo. Negócio
-    // Perdido também sai da soma (09/09/2026, caso real: Nilza foi marcada
-    // Perdida no funil e o valor dela continuava inflando o "previsto" — um
-    // negócio morto não é mais uma previsão de venda futura).
-    if (r.deal_status !== 'won' && r.deal_status !== 'lost') {
+    // Negócio já Ganho não conta como "previsto" (venda/caixa) — já virou
+    // passado, e já está somado do lado do realizado. Negócio Perdido também
+    // sai da soma (09-10/09/2026, casos reais: Nilza, Alberto Moron, Daniel
+    // Thiago) — um negócio morto não é mais previsão de venda futura.
+    if (r.deal_status !== 'won' && !previsaoPerdido(r)) {
       acc.venda += r.venda || 0;
       acc.caixa += r.caixa || 0;
     }
@@ -1281,7 +1285,7 @@ function previsaoTotalRowHtml(label, rows, comTemperatura) {
       <td></td>
     </tr>`;
 }
-const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente');
+const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won');
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
 // Uma linha "Total {Funil}" por funil presente — só faz sentido quando a lista
 // junta mais de um (Inbound a partir de 01/09/2026); nas páginas que só têm o

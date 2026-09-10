@@ -610,10 +610,25 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     # quer ver tudo ali. Linha sem FUNIL preenchido não aparece em nenhuma página
     # (não dá pra saber de qual é) até alguém preencher.
     previsao_funil = previsao_out if previsao_todos_funis else [r for r in previsao_out if r.get('funil') == funil_nome]
-    # Negócio Ganho OU Perdido não conta mais como "previsto" (mesma lógica do
-    # rodapé da tabela em dashboard_template.html) — um negócio morto não é
-    # mais uma previsão de venda futura (09/09/2026, caso real: Nilza).
-    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') not in ('won', 'lost')]
+
+    def _prev_perdido(r):
+        # "Perdido" = deu lost no Pipedrive OU o time marcou PERDIDO na coluna
+        # Confiança da planilha (às vezes o time marca antes do Pipedrive, ou o
+        # negócio nem tem link válido) — pedido do time (10/09/2026).
+        return r.get('deal_status') == 'lost' or 'perdid' in str(r.get('confianca') or '').lower()
+
+    def _prev_ordem(r):
+        # Ganhos e Perdidos aglutinados no topo; o resto (pipeline vivo) logo
+        # abaixo, ordenado pela data de fechamento esperada (sem data vai pro
+        # fim). Pedido do time (10/09/2026).
+        grupo = 0 if r.get('deal_status') == 'won' else (1 if _prev_perdido(r) else 2)
+        return (grupo, r.get('data_fechamento_esperada') or '9999-12-31')
+
+    previsao_funil = sorted(previsao_funil, key=_prev_ordem)
+    # Negócio Ganho OU Perdido não conta no "previsto" (venda/caixa/contratos) —
+    # um negócio morto não é mais uma previsão de venda futura (09-10/09/2026,
+    # casos reais: Nilza, Alberto Moron, Daniel Thiago).
+    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won' and not _prev_perdido(r)]
     scoreboard_previsto = {
         'contratos_previstos': len(previsao_pendente),
         'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),

@@ -276,6 +276,49 @@ for _, d in candidatos.iterrows():
     ])
     print(f'   + {d.get("pessoa_nome") or d.get("titulo")} (deal {deal_id}, {modelo}) — R$ {d["valor"]:,.2f}')
 
+# ============= 3.5) Backfill de negócios já GANHOS no mês que nunca passaram
+# pela planilha =============
+# O filtro de "candidato" acima exige Venda > 0 — mas um negócio de modelo
+# Partner (parceria, sem cobrança) sempre tem Venda R$0 no Pipedrive, então
+# NUNCA entra como candidato "aberto", mesmo depois de fechado. Resultado:
+# esse fechamento aparecia certo no Placar do mês (que lê direto do Pipedrive,
+# sem depender da planilha) mas sumia da tabela de Previsão — o time via
+# "3 contratos" no Placar e só 2 "Ganho" aqui embaixo. Corrigido (11/09/2026,
+# caso real: Antonio Santana, Partner, Venda R$0, nunca virou linha). Aqui não
+# depende de Venda>0 nem de Data esperada (o negócio já fechou, não precisa
+# mais de previsão) — só de ter produto vinculado (pra saber o Modelo) e ter
+# sido Ganho ESTE mês num dos pipelines da Fiscal.
+if not df.empty and 'won_time' in df.columns:
+    _wt = pd.to_datetime(df['won_time'], errors='coerce')
+    ganhos = df[
+        (df['status'] == 'won')
+        & df['pipeline_id'].isin(config.FUNIL_POR_PIPELINE.keys())
+        & _wt.notna()
+        & (_wt.dt.date >= config.MONTH_START) & (_wt.dt.date <= config.MONTH_END)
+        & ~df['deal_id'].isin(deal_ids_existentes)
+    ].copy()
+    if not ganhos.empty and nomes_existentes:
+        _nomes_g = ganhos.apply(lambda r: _norm_nome(r.get('pessoa_nome') or r.get('titulo') or ''), axis=1)
+        ganhos = ganhos[~_nomes_g.isin(nomes_existentes)]
+    if not ganhos.empty:
+        print(f'   {len(ganhos)} negócio(s) Ganho(s) este mês, ainda não na planilha (checando produto vinculado)')
+    for _, d in ganhos.iterrows():
+        deal_id = int(d['deal_id'])
+        produtos = _fetch_deal_products(deal_id)
+        if not produtos:
+            continue  # ganho mas sem produto vinculado — não dá pra saber o Modelo
+        modelo = _modelo_from_produto(produtos[0].get('name'))
+        hoje = date.today().strftime('%d/%m/%Y')
+        caixa = d.get('caixa')
+        data_fech = _fmt_data_br(d.get('expected_close_date')) or _fmt_data_br(d.get('won_time'))
+        novas_linhas.append([
+            hoje, _closer_primeiro_nome(d.get('closer_nome')), d.get('pessoa_nome') or d.get('titulo') or '',
+            config.FUNIL_POR_PIPELINE.get(int(d['pipeline_id']), ''), modelo, 'Studio Fiscal',
+            float(caixa) if pd.notna(caixa) else '', float(d['valor']), data_fech,
+            'Ganho (auto)', hoje, 'FECHADO', f'https://{config.PIPEDRIVE_DOMAIN}/deal/{deal_id}',
+        ])
+        print(f'   + [Ganho] {d.get("pessoa_nome") or d.get("titulo")} (deal {deal_id}, {modelo}) — R$ {d["valor"]:,.2f}')
+
 if not novas_linhas:
     print('-> Sync automático da Previsão: nada novo pra adicionar (candidatos sem produto vinculado ainda).')
     sys.exit(0)

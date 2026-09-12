@@ -102,6 +102,26 @@ def per_closer_daily(df, date_col, nome, status=None):
     return out
 
 
+def per_closer_daily_sum(df, date_col, value_col, nome, status=None):
+    """Igual a per_closer_daily, mas SOMA value_col por dia em vez de contar
+    linhas — usado pro Venda/Caixa realizado diário (página Período
+    personalizado, 12/09/2026: "todos os indicadores refletirem o período
+    escolhido" incluía o Placar, que até então só existia como total do mês)."""
+    if df.empty or 'closer_nome' not in df.columns or date_col not in df.columns or value_col not in df.columns:
+        return {}
+    d = df[df['closer_nome'] == nome]
+    if status is not None:
+        d = d[d.get('status') == status]
+    d = d.copy()
+    d[date_col] = pd.to_datetime(d[date_col], errors='coerce').dt.date
+    out = {}
+    for day, val in zip(d[date_col], d[value_col]):
+        if pd.notna(day) and config.MONTH_START <= day <= config.MONTH_END and pd.notna(val):
+            key = day.isoformat()
+            out[key] = out.get(key, 0) + float(val)
+    return out
+
+
 def daily_series(df, date_col):
     out = {}
     if df.empty or date_col not in df.columns:
@@ -378,6 +398,8 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
             'contratos_franquia': contratos_diario_por_tipo(c['nome'], 'franquia'),
             'contratos_partner': contratos_diario_por_tipo(c['nome'], 'partner'),
             'no_show': per_closer_daily(no_show_p, 'marked_as_done_time', c['nome']),
+            'venda': per_closer_daily_sum(deals_pipe, 'won_time', 'valor', c['nome'], status='won'),
+            'caixa': per_closer_daily_sum(deals_pipe, 'won_time', 'caixa', c['nome'], status='won'),
         }
         closers_out.append({'nome': c['nome'], 'foto': c['foto'], **metrics, 'diario': diario})
 
@@ -511,7 +533,7 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     }
 
     # ============= PERDIDOS =============
-    perdidos = {'total': 0, 'pela_qualificadora': 0, 'apos_repasse': 0, 'por_motivo': []}
+    perdidos = {'total': 0, 'pela_qualificadora': 0, 'apos_repasse': 0, 'por_motivo': [], 'detalhe': []}
     if not deals_p.empty:
         dl = deals_p[deals_p['status'] == 'lost'].copy()
         dl['lost_time'] = pd.to_datetime(dl['lost_time'], errors='coerce').dt.date
@@ -528,6 +550,18 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         perdidos['por_motivo'] = [
             {'motivo': k, 'total': int(v), 'qualificadora': int(motivo_qualificadora.get(k, 0)), 'expansao': int(motivo_expansao.get(k, 0))}
             for k, v in motivo_totais
+        ]
+        # Lista negócio a negócio (data + motivo) — só o total do mês não dava pra
+        # recortar um período customizado (página Período personalizado,
+        # 12/09/2026: "todos os indicadores refletirem o período escolhido").
+        perdidos['detalhe'] = [
+            {
+                'data': r['lost_time'].isoformat() if pd.notna(r['lost_time']) else None,
+                'motivo': r['motivo'],
+                'pela_qualificadora': bool(r['pela_qualificadora']),
+                'closer_nome': None if pd.isna(r.get('closer_nome')) else r.get('closer_nome'),
+            }
+            for _, r in dl.iterrows()
         ]
 
     # ============= RANKING CAMPANHAS / CRIATIVOS (por CC1 realizada) =============
@@ -557,9 +591,31 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         piores = sorted(piores_pool, key=lambda i: (i['conversao'] if i['conversao'] is not None else 999, i['cc1']))[:5]
         return {'melhores': melhores, 'piores': piores}
 
+    # Lista bruta (data + utm_campanha + utm_criativo) de leads e CC1 realizada —
+    # o ranking acima já vem pronto pro mês inteiro, mas a página Período
+    # personalizado precisa recalcular pra um recorte de datas arbitrário
+    # (12/09/2026: "todos os indicadores refletirem o período escolhido").
+    def _ranking_bruto(df, date_col):
+        if df.empty or date_col not in df.columns:
+            return []
+        d = df.copy()
+        d[date_col] = pd.to_datetime(d[date_col], errors='coerce').dt.date
+        out = []
+        for _, r in d.dropna(subset=[date_col]).iterrows():
+            if not (config.MONTH_START <= r[date_col] <= config.MONTH_END):
+                continue
+            out.append({
+                'data': r[date_col].isoformat(),
+                'utm_campanha': None if pd.isna(r.get('utm_campanha')) else str(r.get('utm_campanha')).strip() or None,
+                'utm_criativo': None if pd.isna(r.get('utm_criativo')) else str(r.get('utm_criativo')).strip() or None,
+            })
+        return out
+
     ranking = {
         'campanhas': ranking_utm('utm_campanha'),
         'criativos': ranking_utm('utm_criativo'),
+        'detalhe_leads': _ranking_bruto(deals_p, 'add_time'),
+        'detalhe_cc1': _ranking_bruto(cc1_p, 'marked_as_done_time'),
     }
 
     # ============= MAPA DE CALOR — HORÁRIOS DE CC1 REALIZADA (seg-sex, 09h-20h) =============

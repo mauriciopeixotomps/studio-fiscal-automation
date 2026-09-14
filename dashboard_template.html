@@ -54,6 +54,8 @@
   }
   .card h2 { font-size: 16px; margin: 0 0 16px; color: var(--text); }
   .card h2 .hint { color: var(--text-dim); font-weight: 400; font-size: 13px; }
+  .card h2 .dia-badge { color: var(--accent); font-weight: 700; font-size: 12px; margin-left: 8px; }
+  .card h2 .dia-badge:empty { display: none; }
 
   /* ===== Meta / progresso ===== */
   .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px; }
@@ -323,7 +325,7 @@
   </header>
 
   <div class="card" id="card-placar">
-    <h2>Placar do mês <span class="hint">— Realizado vem direto do Pipedrive (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão</span></h2>
+    <h2>Placar do mês <span class="hint">— Realizado vem direto do Pipedrive (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão</span><span class="dia-badge" id="dia-badge-placar"></span></h2>
     <div class="scoreboard">
       <div class="score-item green">
         <div class="lbl">Contratos fechados</div>
@@ -402,12 +404,12 @@
   </div>
 
   <div class="card">
-    <h2>Consolidado do time <span class="hint" id="consolidado-hint">— funil CC1 → FPQ → CC2 → CC3 → Contrato enviado → Fechado</span></h2>
+    <h2>Consolidado do time <span class="hint" id="consolidado-hint">— funil CC1 → FPQ → CC2 → CC3 → Contrato enviado → Fechado</span><span class="dia-badge" id="dia-badge-consolidado"></span></h2>
     <div id="funnel-consolidado" class="funnel"></div>
   </div>
 
   <div class="card">
-    <h2>Perdidos <span class="hint" id="perdidos-hint">— negócios perdidos no funil Studio Fiscal Franquia no mês</span></h2>
+    <h2>Perdidos <span class="hint" id="perdidos-hint">— negócios perdidos no funil Studio Fiscal Franquia no mês</span><span class="dia-badge" id="dia-badge-perdidos"></span></h2>
     <div class="lost-summary">
       <div class="item"><div class="v" id="lost-total">0</div><div class="l">Total perdidos</div></div>
       <div class="item"><div class="v" id="lost-qualificadora">0</div><div class="l">Perdidos pela Qualificadora</div></div>
@@ -431,7 +433,7 @@
   </div>
 
   <div class="card">
-    <h2>Ranking de campanhas e criativos <span class="hint">— por CC1 realizada no mês</span></h2>
+    <h2>Ranking de campanhas e criativos <span class="hint">— por CC1 realizada no mês</span><span class="dia-badge" id="dia-badge-ranking"></span></h2>
     <div class="ranking-grid">
       <div class="ranking-block">
         <h4>Campanhas (UTM campaign)</h4>
@@ -629,28 +631,35 @@ function scoreSubHtml(previsto, realizado, fmt) {
     : `faltam <span class="falta pendente">${fmt(falta)}</span>`;
   return `Previsto <b>${fmt(previsto)}</b> · ${faltaTxt}`;
 }
-document.getElementById('score-contratos').textContent = D.scoreboard.contratos_fechados;
-document.getElementById('score-venda').textContent = fmtMoney(D.scoreboard.venda_realizada_total);
-document.getElementById('score-caixa').textContent = fmtMoney(D.scoreboard.caixa_realizado_total);
-document.getElementById('score-contratos-sub').innerHTML =
-  scoreSubHtml(D.scoreboard.contratos_previstos, D.scoreboard.contratos_fechados, v => v);
-document.getElementById('score-venda-sub').innerHTML =
-  scoreSubHtml(D.scoreboard.venda_prevista_total, D.scoreboard.venda_realizada_total, fmtMoney);
-document.getElementById('score-caixa-sub').innerHTML =
-  scoreSubHtml(D.scoreboard.caixa_prevista_total, D.scoreboard.caixa_realizado_total, fmtMoney);
-
 // Franquia (tem valor) x Partner (grátis) dentro do "Contratos fechados" —
 // só aparece se já tiver algum contrato fechado no mês (evita "0 · 0" à toa).
 function tipoContratoTxt(franquia, partner, fmt) {
   if (!franquia && !partner) return '';
   return `${fmt(franquia)} Franquia · ${fmt(partner)} Partner`;
 }
-document.getElementById('score-contratos-tipo').textContent =
-  tipoContratoTxt(D.scoreboard.contratos_fechados_franquia, D.scoreboard.contratos_fechados_partner, v => v);
-document.getElementById('score-venda-tipo').textContent =
-  tipoContratoTxt(D.scoreboard.venda_realizada_franquia, D.scoreboard.venda_realizada_partner, fmtMoney);
-document.getElementById('score-caixa-tipo').textContent =
-  tipoContratoTxt(D.scoreboard.caixa_realizado_franquia, D.scoreboard.caixa_realizado_partner, fmtMoney);
+// diaMode: quando true, "Previsto/faltam" e a quebra Franquia/Partner em
+// dinheiro somem — não fazem sentido pra um dia só (Previsto é uma projeção
+// do MÊS inteiro; a quebra de dinheiro por tipo não é somada por dia, só por
+// mês inteiro). A quebra de CONTAGEM (nº de contratos) continua, essa sim
+// existe por dia. Ver aplicarFiltroDia() (pedido do time, 13/09/2026).
+function renderScoreboard(sb, diaMode) {
+  document.getElementById('score-contratos').textContent = sb.contratos_fechados;
+  document.getElementById('score-venda').textContent = fmtMoney(sb.venda_realizada_total);
+  document.getElementById('score-caixa').textContent = fmtMoney(sb.caixa_realizado_total);
+  document.getElementById('score-contratos-sub').innerHTML =
+    diaMode ? '' : scoreSubHtml(sb.contratos_previstos, sb.contratos_fechados, v => v);
+  document.getElementById('score-venda-sub').innerHTML =
+    diaMode ? '' : scoreSubHtml(sb.venda_prevista_total, sb.venda_realizada_total, fmtMoney);
+  document.getElementById('score-caixa-sub').innerHTML =
+    diaMode ? '' : scoreSubHtml(sb.caixa_prevista_total, sb.caixa_realizado_total, fmtMoney);
+  document.getElementById('score-contratos-tipo').textContent =
+    tipoContratoTxt(sb.contratos_fechados_franquia, sb.contratos_fechados_partner, v => v);
+  document.getElementById('score-venda-tipo').textContent =
+    diaMode ? '' : tipoContratoTxt(sb.venda_realizada_franquia, sb.venda_realizada_partner, fmtMoney);
+  document.getElementById('score-caixa-tipo').textContent =
+    diaMode ? '' : tipoContratoTxt(sb.caixa_realizado_franquia, sb.caixa_realizado_partner, fmtMoney);
+}
+renderScoreboard(D.scoreboard, false);
 
 // ===== Datas do mês (usado pelo pace e pelos gráficos) =====
 const MONTH_DATES = (function() {
@@ -890,27 +899,29 @@ if (D.consolidado.leads_qualificados !== undefined) {
 }
 
 // ===== Perdidos =====
-document.getElementById('lost-total').textContent = D.perdidos.total;
-document.getElementById('lost-qualificadora').textContent = D.perdidos.pela_qualificadora;
-document.getElementById('lost-repasse').textContent = D.perdidos.apos_repasse;
-
-function renderLostBlock(elId, field) {
-  const itens = D.perdidos.por_motivo
-    .filter(m => m[field] > 0)
-    .sort((a, b) => b[field] - a[field]);
-  const max = Math.max(1, ...itens.map(m => m[field]));
-  document.getElementById(elId).innerHTML = itens.length
-    ? itens.map(m => `
-        <div class="lost-reason-row">
-          <div class="l">${m.motivo}</div>
-          <div class="lost-reason-track"><div class="lost-reason-fill" style="width:${100 * m[field] / max}%"></div></div>
-          <div class="v">${m[field]}</div>
-        </div>
-      `).join('')
-    : '<div style="color:var(--text-dim);font-size:13px">Nenhum perdido no mês.</div>';
+function renderPerdidosCard(p) {
+  document.getElementById('lost-total').textContent = p.total;
+  document.getElementById('lost-qualificadora').textContent = p.pela_qualificadora;
+  document.getElementById('lost-repasse').textContent = p.apos_repasse;
+  function renderLostBlock(elId, field, semDadosTxt) {
+    const itens = p.por_motivo
+      .filter(m => m[field] > 0)
+      .sort((a, b) => b[field] - a[field]);
+    const max = Math.max(1, ...itens.map(m => m[field]));
+    document.getElementById(elId).innerHTML = itens.length
+      ? itens.map(m => `
+          <div class="lost-reason-row">
+            <div class="l">${m.motivo}</div>
+            <div class="lost-reason-track"><div class="lost-reason-fill" style="width:${100 * m[field] / max}%"></div></div>
+            <div class="v">${m[field]}</div>
+          </div>
+        `).join('')
+      : `<div style="color:var(--text-dim);font-size:13px">${semDadosTxt}</div>`;
+  }
+  renderLostBlock('lost-reasons-qualificadora', 'qualificadora', 'Nenhum perdido nesse período.');
+  renderLostBlock('lost-reasons-expansao', 'expansao', 'Nenhum perdido nesse período.');
 }
-renderLostBlock('lost-reasons-qualificadora', 'qualificadora');
-renderLostBlock('lost-reasons-expansao', 'expansao');
+renderPerdidosCard(D.perdidos);
 
 // ===== Comparativo entre closers (funil individual, mesma linguagem visual do consolidado) =====
 document.getElementById('compare-grid').innerHTML = D.closers.map((c, i) => `
@@ -937,10 +948,99 @@ function rkList(items, cls, title) {
     items.length ? items.map(rkRow).join('') : '<div style="color:var(--text-dim);font-size:12px">Sem dados suficientes</div>'
   }</div>`;
 }
-document.getElementById('ranking-campanhas').innerHTML =
-  rkList(D.ranking.campanhas.melhores, 'best', 'Melhores') + rkList(D.ranking.campanhas.piores, 'worst', 'Piores');
-document.getElementById('ranking-criativos').innerHTML =
-  rkList(D.ranking.criativos.melhores, 'best', 'Melhores') + rkList(D.ranking.criativos.piores, 'worst', 'Piores');
+function renderRankingCard(ranking) {
+  document.getElementById('ranking-campanhas').innerHTML =
+    rkList(ranking.campanhas.melhores, 'best', 'Melhores') + rkList(ranking.campanhas.piores, 'worst', 'Piores');
+  document.getElementById('ranking-criativos').innerHTML =
+    rkList(ranking.criativos.melhores, 'best', 'Melhores') + rkList(ranking.criativos.piores, 'worst', 'Piores');
+}
+renderRankingCard(D.ranking);
+
+// ===== Filtro por dia — Placar, Consolidado do time, Perdidos e Ranking
+// passam a refletir o dia escolhido em "Ver o dia" (Relatório por closer),
+// não só a própria tabela de Relatório. Pedido do time (13/09/2026): "quando
+// ajustar a data no relatório, todos os dados sejam vistos conforme aquele
+// período". Mapa de calor / FPQs recebidas / Metas do mês / Ritmo / Previsão
+// continuam de mês inteiro — Metas e Ritmo são projeções do MÊS por
+// natureza (não fazem sentido pra 1 dia); Previsão é uma lista viva de
+// negócios em aberto, não um evento datado; Mapa de calor e FPQs recebidas
+// ficam de fora por ora (podem entrar depois se fizer falta). =====
+const DIA_METRICAS = ['leads', 'cc1_realizada', 'fpq_realizada', 'cc2_realizada', 'cc3_realizada', 'contrato_enviado', 'contratos', 'contratos_franquia', 'contratos_partner', 'venda', 'caixa'];
+function diaPct(a, b) { return b ? Math.round(1000 * a / b) / 10 : null; }
+function diaSomaMetricas(iso) {
+  const out = {};
+  DIA_METRICAS.forEach(k => { out[k] = 0; });
+  D.closers.forEach(c => {
+    DIA_METRICAS.forEach(k => { out[k] += (c.diario[k] || {})[iso] || 0; });
+  });
+  // renderFunnel()/funnelStages() espera um objeto no mesmo formato de
+  // D.consolidado (com .conversao) — sem isso quebra lendo m.conversao.* undefined.
+  out.conversao = {
+    cc1_para_fpq: diaPct(out.fpq_realizada, out.cc1_realizada),
+    fpq_para_cc2: diaPct(out.cc2_realizada, out.fpq_realizada),
+    cc2_para_cc3: diaPct(out.cc3_realizada, out.cc2_realizada),
+  };
+  return out;
+}
+function diaPerdidos(iso) {
+  const lista = (D.perdidos.detalhe || []).filter(x => x.data === iso);
+  const qualificadora = lista.filter(x => x.pela_qualificadora).length;
+  const contar = arr => {
+    const m = {};
+    arr.forEach(x => { const k = x.motivo || 'Não informado'; m[k] = (m[k] || 0) + 1; });
+    return m;
+  };
+  const mQ = contar(lista.filter(x => x.pela_qualificadora));
+  const mE = contar(lista.filter(x => !x.pela_qualificadora));
+  const motivos = [...new Set(lista.map(x => x.motivo || 'Não informado'))];
+  return {
+    total: lista.length, pela_qualificadora: qualificadora, apos_repasse: lista.length - qualificadora,
+    por_motivo: motivos.map(m => ({ motivo: m, qualificadora: mQ[m] || 0, expansao: mE[m] || 0 })),
+  };
+}
+function diaRankingUtm(iso, col) {
+  const leads = (D.ranking.detalhe_leads || []).filter(x => x.data === iso);
+  const cc1 = (D.ranking.detalhe_cc1 || []).filter(x => x.data === iso);
+  const leadsCount = {}, cc1Count = {};
+  leads.forEach(x => { const v = x[col]; if (v) leadsCount[v] = (leadsCount[v] || 0) + 1; });
+  cc1.forEach(x => { const v = x[col]; if (v) cc1Count[v] = (cc1Count[v] || 0) + 1; });
+  const nomes = new Set([...Object.keys(leadsCount), ...Object.keys(cc1Count)]);
+  const itens = [...nomes].map(nome => {
+    const leadsN = leadsCount[nome] || 0, cc1N = cc1Count[nome] || 0;
+    return { nome, leads: leadsN, cc1: cc1N, conversao: leadsN ? Math.round(1000 * cc1N / leadsN) / 10 : null };
+  });
+  const melhores = itens.filter(i => i.cc1 > 0).sort((a, b) => (b.cc1 - a.cc1) || ((b.conversao || 0) - (a.conversao || 0))).slice(0, 5);
+  let piores = itens.filter(i => i.leads >= 3);
+  if (!piores.length) piores = itens.filter(i => i.leads >= 1);
+  piores = piores.sort((a, b) => ((a.conversao ?? 999) - (b.conversao ?? 999)) || (a.cc1 - b.cc1)).slice(0, 5);
+  return { melhores, piores };
+}
+function marcarBadgesDia(txt) {
+  ['dia-badge-placar', 'dia-badge-consolidado', 'dia-badge-perdidos', 'dia-badge-ranking'].forEach(id => {
+    document.getElementById(id).textContent = txt || '';
+  });
+}
+function aplicarFiltroDia(iso) {
+  const dia = diaSomaMetricas(iso);
+  renderScoreboard({
+    contratos_fechados: dia.contratos,
+    contratos_fechados_franquia: dia.contratos_franquia,
+    contratos_fechados_partner: dia.contratos_partner,
+    venda_realizada_total: dia.venda,
+    caixa_realizado_total: dia.caixa,
+  }, true);
+  renderFunnel('funnel-consolidado', dia);
+  renderPerdidosCard(diaPerdidos(iso));
+  renderRankingCard({ campanhas: diaRankingUtm(iso, 'utm_campanha'), criativos: diaRankingUtm(iso, 'utm_criativo') });
+  marcarBadgesDia('— dia ' + fmtDate(iso));
+}
+function limparFiltroDia() {
+  renderScoreboard(D.scoreboard, false);
+  renderFunnel('funnel-consolidado', D.consolidado);
+  renderPerdidosCard(D.perdidos);
+  renderRankingCard(D.ranking);
+  marcarBadgesDia('');
+}
 
 // ===== Mapa de calor — horários de CC1 (dias no topo, horas na lateral, estilo agenda) =====
 (function renderHeatmapCC1() {
@@ -1130,10 +1230,12 @@ relatorioDataInput.addEventListener('change', () => {
   document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(b => b.classList.remove('active'));
   document.querySelector('#relatorio-tabs-global .rtab[data-period="diario"]').classList.add('active');
   relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+  aplicarFiltroDia(relatorioDataInput.value);
 });
 document.getElementById('relatorio-data-limpar').addEventListener('click', () => {
   relatorioDataInput.value = '';
   relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+  limparFiltroDia();
 });
 
 relatorioRefresh();
@@ -1144,6 +1246,11 @@ document.querySelectorAll('#relatorio-tabs-global .rtab').forEach(btn => {
     btn.classList.add('active');
     relatorioPeriod = btn.dataset.period;
     relatorioRenderPeriod(relatorioPeriod, relatorioOrder);
+    // Placar/Consolidado/Perdidos/Ranking só ficam "de um dia só" quando tem
+    // uma data específica escolhida — trocar de aba sem data (ou pra
+    // Semanal/Mês) volta tudo pro mês inteiro.
+    if (relatorioPeriod === 'diario' && relatorioDataInput.value) aplicarFiltroDia(relatorioDataInput.value);
+    else limparFiltroDia();
   });
 });
 

@@ -349,7 +349,7 @@
   </div>
 
   <div class="card" id="card-metas">
-    <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (mesmo número do "Contratos fechados" do Placar do mês)</span></h2>
+    <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (mesmo número do "Contratos fechados" do Placar do mês)</span><span class="dia-badge" id="dia-badge-metas"></span></h2>
     <div class="meta-grid">
       <div class="meta-block">
         <h3>Negócios iniciados Studio Fiscal</h3>
@@ -383,7 +383,7 @@
   </div>
 
   <div class="card" id="card-agendadores" style="display:none;">
-    <h2>Time de agendamento <span class="hint">— % agendamento = agendamentos / leads recebidos; % realizada = CC1 realizada / agendamentos; % no-show = no-show / agendamentos. "Faltam" = quanto falta pra bater a própria meta (30%/65%) com o que já foi feito até agora</span></h2>
+    <h2>Time de agendamento <span class="hint">— % agendamento = agendamentos / leads recebidos; % realizada = CC1 realizada / agendamentos; % no-show = no-show / agendamentos. "Faltam" = quanto falta pra bater a própria meta (30%/65%) com o que já foi feito até agora</span><span class="dia-badge" id="dia-badge-agendadores"></span></h2>
     <div style="overflow-x:auto">
       <table id="agendadores-table">
         <thead>
@@ -496,11 +496,11 @@
 
   <div class="card-row">
     <div class="card">
-      <h2>Mapa de calor — horários de CC1 <span class="hint">— seg-sex, 09h-20h, pelo horário em que foi marcada como realizada</span></h2>
+      <h2>Mapa de calor — horários de CC1 <span class="hint">— seg-sex, 09h-20h, pelo horário em que foi marcada como realizada</span><span class="dia-badge" id="dia-badge-heatmap"></span></h2>
       <div id="heatmap-cc1"></div>
     </div>
     <div class="card">
-      <h2>FPQs recebidas <span class="hint">— clique em "ver" pra abrir o negócio no Pipedrive e ler a FPQ completa</span></h2>
+      <h2>FPQs recebidas <span class="hint">— clique em "ver" pra abrir o negócio no Pipedrive e ler a FPQ completa</span><span class="dia-badge" id="dia-badge-fpq"></span></h2>
       <div class="relatorio-sort" style="margin-bottom:12px">
         <label for="fpq-closer-filter">Closer</label>
         <select id="fpq-closer-filter"></select>
@@ -683,32 +683,7 @@ function cumulativeFromDaily(daily) {
   return MONTH_DATES.map(iso => { cum += (daily[iso] || 0); return cum; });
 }
 
-// ===== Meta leads =====
-document.getElementById('meta-leads-atual').textContent = D.consolidado.leads;
-document.getElementById('meta-leads-total').textContent = D.meta_leads ?? '—';
-const pctLeads = D.meta_leads ? Math.min(100, 100 * D.consolidado.leads / D.meta_leads) : 0;
-document.getElementById('meta-leads-fill').style.width = pctLeads + '%';
-document.getElementById('meta-leads-pace').textContent =
-  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-
-// ===== Meta CC1 =====
-document.getElementById('meta-cc1-atual').textContent = D.consolidado.cc1_realizada;
-document.getElementById('meta-cc1-total').textContent = D.pace.cc1.meta ?? '—';
-const pctCC1 = D.pace.cc1.meta ? Math.min(100, 100 * D.consolidado.cc1_realizada / D.pace.cc1.meta) : 0;
-document.getElementById('meta-cc1-fill').style.width = pctCC1 + '%';
-document.getElementById('meta-cc1-pace').textContent =
-  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-document.getElementById('meta-cc1-futura').innerHTML =
-  `<b>${D.consolidado.cc1_futura}</b> para acontecer`;
-
-// ===== Meta contratos =====
-document.getElementById('meta-atual').textContent = D.consolidado.contratos;
-document.getElementById('meta-total').textContent = D.meta_contratos;
-const pctMeta = D.meta_contratos ? Math.min(100, 100 * D.consolidado.contratos / D.meta_contratos) : 0;
-document.getElementById('meta-fill').style.width = pctMeta + '%';
-document.getElementById('meta-pace').textContent =
-  `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-
+// ===== Metas do mês (leads / CC1 / contratos) =====
 function setStatus(elId, key) {
   const p = D.pace[key];
   const el = document.getElementById(elId);
@@ -722,9 +697,49 @@ function setStatus(elId, key) {
   el.innerHTML = `Hoje deveria estar em <b>${idealHoje}</b> · está em <b>${realHoje}</b> <span class="diff-tag">(${diffTxt})</span>`;
   el.className = 'meta-status ' + (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
 }
-setStatus('meta-leads-status', 'leads');
-setStatus('meta-cc1-status', 'cc1');
-setStatus('meta-contratos-status', 'contratos');
+// Progresso/ritmo/status são conceitos de META DO MÊS (acumulado, dias úteis
+// já passados) — não fazem sentido recalculados pra 1 dia só. Em dia
+// filtrado, os 3 números viram a contagem daquele dia (o "/ meta" continua
+// mostrando o alvo do mês inteiro, só de referência) e o resto (barra,
+// ritmo, "abaixo/acima do ritmo") some — não tem como comparar 1 dia com uma
+// meta pensada pro mês inteiro sem inventar um número (pedido do time,
+// 16/09/2026: "todas as informações... independente do período").
+function renderMetas(diaMode, dia) {
+  document.getElementById('meta-leads-atual').textContent = diaMode ? dia.leads : D.consolidado.leads;
+  document.getElementById('meta-leads-total').textContent = D.meta_leads ?? '—';
+  const pctLeads = (!diaMode && D.meta_leads) ? Math.min(100, 100 * D.consolidado.leads / D.meta_leads) : 0;
+  document.getElementById('meta-leads-fill').style.width = pctLeads + '%';
+  document.getElementById('meta-leads-pace').textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+  document.getElementById('meta-cc1-atual').textContent = diaMode ? dia.cc1_realizada : D.consolidado.cc1_realizada;
+  document.getElementById('meta-cc1-total').textContent = D.pace.cc1.meta ?? '—';
+  const pctCC1 = (!diaMode && D.pace.cc1.meta) ? Math.min(100, 100 * D.consolidado.cc1_realizada / D.pace.cc1.meta) : 0;
+  document.getElementById('meta-cc1-fill').style.width = pctCC1 + '%';
+  document.getElementById('meta-cc1-pace').textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+  document.getElementById('meta-cc1-futura').innerHTML = diaMode ? '' : `<b>${D.consolidado.cc1_futura}</b> para acontecer`;
+
+  document.getElementById('meta-atual').textContent = diaMode ? dia.contratos : D.consolidado.contratos;
+  document.getElementById('meta-total').textContent = D.meta_contratos;
+  const pctMeta = (!diaMode && D.meta_contratos) ? Math.min(100, 100 * D.consolidado.contratos / D.meta_contratos) : 0;
+  document.getElementById('meta-fill').style.width = pctMeta + '%';
+  document.getElementById('meta-pace').textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+  if (diaMode) {
+    ['meta-leads-status', 'meta-cc1-status', 'meta-contratos-status'].forEach(id => {
+      const el = document.getElementById(id);
+      el.textContent = '';
+      el.className = 'meta-status';
+    });
+  } else {
+    setStatus('meta-leads-status', 'leads');
+    setStatus('meta-cc1-status', 'cc1');
+    setStatus('meta-contratos-status', 'contratos');
+  }
+}
+renderMetas(false);
 
 // ===== Pace por indicador =====
 const PACE_COLORS = {
@@ -1016,8 +1031,10 @@ function diaRankingUtm(iso, col) {
   return { melhores, piores };
 }
 function marcarBadgesDia(txt) {
-  ['dia-badge-placar', 'dia-badge-consolidado', 'dia-badge-perdidos', 'dia-badge-ranking'].forEach(id => {
-    document.getElementById(id).textContent = txt || '';
+  ['dia-badge-placar', 'dia-badge-consolidado', 'dia-badge-perdidos', 'dia-badge-ranking',
+   'dia-badge-metas', 'dia-badge-agendadores', 'dia-badge-heatmap', 'dia-badge-fpq'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = txt || '';
   });
 }
 function aplicarFiltroDia(iso) {
@@ -1032,6 +1049,11 @@ function aplicarFiltroDia(iso) {
   renderFunnel('funnel-consolidado', dia);
   renderPerdidosCard(diaPerdidos(iso));
   renderRankingCard({ campanhas: diaRankingUtm(iso, 'utm_campanha'), criativos: diaRankingUtm(iso, 'utm_criativo') });
+  renderMetas(true, dia);
+  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores.map(a => agendadorDiaMetricas(a, iso)), true);
+  renderHeatmap(heatmapMatrizDia(iso));
+  fpqDiaFiltro = iso;
+  fpqRenderTable(fpqCloserFilter.value);
   marcarBadgesDia('— dia ' + fmtDate(iso));
 }
 function limparFiltroDia() {
@@ -1039,12 +1061,17 @@ function limparFiltroDia() {
   renderFunnel('funnel-consolidado', D.consolidado);
   renderPerdidosCard(D.perdidos);
   renderRankingCard(D.ranking);
+  renderMetas(false);
+  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores, false);
+  renderHeatmap(D.heatmap_cc1.matriz);
+  fpqDiaFiltro = null;
+  fpqRenderTable(fpqCloserFilter.value);
   marcarBadgesDia('');
 }
 
 // ===== Mapa de calor — horários de CC1 (dias no topo, horas na lateral, estilo agenda) =====
-(function renderHeatmapCC1() {
-  const { dias, horas, matriz } = D.heatmap_cc1;
+function renderHeatmap(matriz) {
+  const { dias, horas } = D.heatmap_cc1;
   const max = Math.max(1, ...matriz.flat());
   const cols = dias.length;
   const cellsHtml = [];
@@ -1068,7 +1095,19 @@ function limparFiltroDia() {
         ${cellsHtml.join('')}
       </div>
     </div>`;
-})();
+}
+renderHeatmap(D.heatmap_cc1.matriz);
+function heatmapMatrizDia(iso) {
+  const { dias, horas, detalhe } = D.heatmap_cc1;
+  const m = dias.map(() => horas.map(() => 0));
+  const wd = (new Date(iso + 'T00:00:00').getDay() + 6) % 7; // 0 = segunda
+  if (wd > 4) return m; // mapa só cobre seg-sex
+  (detalhe || []).filter(x => x.data === iso).forEach(x => {
+    const hIdx = horas.indexOf(x.hora);
+    if (hIdx >= 0) m[wd][hIdx]++;
+  });
+  return m;
+}
 
 // ===== Relatório por closer (diário / semanal / mês) =====
 const RELATORIO_METRICS = D.relatorio_metrics;
@@ -1307,8 +1346,11 @@ function confiancaBadge(v) {
   return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
 }
 const fpqTbody = document.querySelector('#fpq-table tbody');
+let fpqDiaFiltro = null; // setado por aplicarFiltroDia/limparFiltroDia
 function fpqRenderTable(closerFiltro) {
-  const rows = closerFiltro ? D.fpqs_recebidas.filter(r => r.closer_nome === closerFiltro) : D.fpqs_recebidas;
+  let rows = closerFiltro ? D.fpqs_recebidas.filter(r => r.closer_nome === closerFiltro) : D.fpqs_recebidas;
+  if (fpqDiaFiltro) rows = rows.filter(r => r.data.slice(0, 10) === fpqDiaFiltro);
+  const semDadosTxt = fpqDiaFiltro ? 'Nenhuma FPQ recebida nesse dia' : 'Nenhuma FPQ recebida no mês';
   fpqTbody.innerHTML = rows.length ? rows.map(r => {
     const [dataPart, horaPart] = r.data.split(' ');
     return `
@@ -1318,7 +1360,7 @@ function fpqRenderTable(closerFiltro) {
       <td>${r.pessoa_nome || r.negocio_titulo || '—'}</td>
       <td>${r.deal_link ? `<a class="link" href="${r.deal_link}" target="_blank">ver</a>` : '—'}</td>
     </tr>`;
-  }).join('') : '<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">Nenhuma FPQ recebida no mês</td></tr>';
+  }).join('') : `<tr><td colspan="4" style="text-align:center;color:var(--text-dim)">${semDadosTxt}</td></tr>`;
 }
 const fpqCloserFilter = document.getElementById('fpq-closer-filter');
 fpqCloserFilter.innerHTML = '<option value="">Todos</option>' +
@@ -1411,27 +1453,42 @@ document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? 
 ) : '';
 
 // ===== Time de agendamento (SDRs dedicados) =====
-if (D.agendadores && D.agendadores.length) {
+function agendadorDiaMetricas(a, iso) {
+  const leads = (a.diario.leads_recebidos || {})[iso] || 0;
+  const ag = (a.diario.agendamentos || {})[iso] || 0;
+  const real = (a.diario.realizadas || {})[iso] || 0;
+  const noShow = (a.diario.no_show || {})[iso] || 0;
+  return {
+    nome: a.nome, leads_recebidos: leads, agendamentos: ag, realizadas: real, no_show: noShow,
+    pct_agendamento: leads ? Math.round(1000 * ag / leads) / 10 : null,
+    pct_realizada: ag ? Math.round(1000 * real / ag) / 10 : null,
+    pct_no_show: ag ? Math.round(1000 * noShow / ag) / 10 : null,
+    faltam_agendamentos: 0, faltam_realizadas: 0,
+  };
+}
+function renderAgendadores(lista, diaMode) {
+  if (!D.agendadores || !D.agendadores.length) return;
   document.getElementById('card-agendadores').style.display = '';
   function pctCell(v, meta) {
     if (v === null || v === undefined) return '<td>—</td>';
+    if (diaMode) return `<td>${v}%</td>`; // meta é do MÊS — comparar com 1 dia só engana
     const cls = v >= meta ? 'ahead' : 'behind';
     const color = cls === 'ahead' ? 'var(--green)' : 'var(--orange)';
     return `<td style="color:${color};font-weight:700">${v}% <span style="color:var(--text-dim);font-weight:400">/ meta ${meta}%</span></td>`;
   }
-  document.querySelector('#agendadores-table tbody').innerHTML = D.agendadores.map(a => {
+  document.querySelector('#agendadores-table tbody').innerHTML = lista.map(a => {
     const faltas = [];
     if (a.faltam_agendamentos > 0) faltas.push(`${a.faltam_agendamentos} agendamento${a.faltam_agendamentos === 1 ? '' : 's'}`);
     if (a.faltam_realizadas > 0) faltas.push(`${a.faltam_realizadas} realizada${a.faltam_realizadas === 1 ? '' : 's'}`);
-    const faltaTxt = faltas.length ? faltas.join(' · ') : '<span style="color:var(--green)">em dia</span>';
+    const faltaTxt = diaMode ? '—' : (faltas.length ? faltas.join(' · ') : '<span style="color:var(--green)">em dia</span>');
     return `
     <tr>
       <td>${a.nome}</td>
       <td>${a.leads_recebidos}</td>
       <td>${a.agendamentos}</td>
-      ${pctCell(a.pct_agendamento, D.agendadores_meta.meta_agendamento_pct)}
+      ${pctCell(a.pct_agendamento, D.agendadores_meta && D.agendadores_meta.meta_agendamento_pct)}
       <td>${a.realizadas}</td>
-      ${pctCell(a.pct_realizada, D.agendadores_meta.meta_realizada_pct)}
+      ${pctCell(a.pct_realizada, D.agendadores_meta && D.agendadores_meta.meta_realizada_pct)}
       <td>${a.no_show}</td>
       <td>${a.pct_no_show === null ? '—' : a.pct_no_show + '%'}</td>
       <td>${faltaTxt}</td>
@@ -1439,6 +1496,7 @@ if (D.agendadores && D.agendadores.length) {
   `;
   }).join('');
 }
+renderAgendadores(D.agendadores, false);
 
 </script>
 </body>

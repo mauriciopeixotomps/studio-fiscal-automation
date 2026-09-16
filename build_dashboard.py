@@ -189,6 +189,38 @@ _no_show_p62 = no_show_re[no_show_re['pipeline_id'] == config.PIPELINE_STUDIO_FI
 _cc1_realizado_deal_ids = set(_cc1_re_p62['negocio_id'].dropna()) if not _cc1_re_p62.empty and 'negocio_id' in _cc1_re_p62.columns else set()
 _no_show_deal_ids = set(_no_show_p62['negocio_id'].dropna()) if not _no_show_p62.empty and 'negocio_id' in _no_show_p62.columns else set()
 
+
+def _dia_by_dealid(df, deal_col, date_col):
+    """{negocio_id: 'AAAA-MM-DD'} — 1ª data válida por negócio (usado pra
+    dar granularidade diária ao Time de agendamento; ver 'diario' abaixo)."""
+    if df.empty or deal_col not in df.columns or date_col not in df.columns:
+        return {}
+    d = df[[deal_col, date_col]].copy()
+    d[date_col] = pd.to_datetime(d[date_col], errors='coerce').dt.date
+    out = {}
+    for _, r in d.dropna(subset=[date_col]).iterrows():
+        out.setdefault(r[deal_col], r[date_col].isoformat())
+    return out
+
+
+_agendamento_dia_by_deal = _dia_by_dealid(agendadores_agendamentos, 'negocio_id', 'marked_as_done_time')
+_cc1_dia_by_deal = _dia_by_dealid(_cc1_re_p62, 'negocio_id', 'marked_as_done_time')
+_no_show_dia_by_deal = _dia_by_dealid(_no_show_p62, 'negocio_id', 'marked_as_done_time')
+
+
+def _contar_por_dia(deal_ids, dia_by_deal):
+    """{'AAAA-MM-DD': n} pra um conjunto de negócios, só dias dentro do mês
+    corrente — mesmo padrão do 'diario' dos closers (ver per_closer_daily)."""
+    out = {}
+    for deal_id in deal_ids:
+        dia = dia_by_deal.get(deal_id)
+        if not dia:
+            continue
+        d = date.fromisoformat(dia)
+        if config.MONTH_START <= d <= config.MONTH_END:
+            out[dia] = out.get(dia, 0) + 1
+    return out
+
 agendadores_out = []
 for a in config.AGENDADORES:
     # "Leads recebidos" = TODO negócio que já tem esse agendador como dono, em
@@ -199,20 +231,34 @@ for a in config.AGENDADORES:
     # contar igual (03/09/2026) — antes disso contava a tarefa "1ª tentativa de
     # contato" (uma etapa seguinte, só depois de alguém começar a trabalhar).
     leads_n = 0
+    leads_dia = {}
     if not deals_agendadores.empty and 'agendador_id' in deals_agendadores.columns and 'add_time' in deals_agendadores.columns:
         _dd = deals_agendadores[deals_agendadores['agendador_id'] == a['id']].copy()
         _dd['add_time'] = pd.to_datetime(_dd['add_time'], errors='coerce').dt.date
-        leads_n = int(_dd['add_time'].apply(
-            lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END
-        ).sum())
+        _dd_mes = _dd[_dd['add_time'].apply(lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END)]
+        leads_n = int(len(_dd_mes))
+        for d in _dd_mes['add_time']:
+            leads_dia[d.isoformat()] = leads_dia.get(d.isoformat(), 0) + 1
     agendamento_deal_ids = set()
     if not agendadores_agendamentos.empty and 'agendador_nome' in agendadores_agendamentos.columns:
         agendamento_deal_ids = set(
             agendadores_agendamentos.loc[agendadores_agendamentos['agendador_nome'] == a['nome'], 'negocio_id'].dropna()
         )
     n_agendamentos = len(agendamento_deal_ids)
-    realizadas_n = len(agendamento_deal_ids & _cc1_realizado_deal_ids)
-    no_show_n = len(agendamento_deal_ids & _no_show_deal_ids)
+    realizadas_ids = agendamento_deal_ids & _cc1_realizado_deal_ids
+    no_show_ids = agendamento_deal_ids & _no_show_deal_ids
+    realizadas_n = len(realizadas_ids)
+    no_show_n = len(no_show_ids)
+    # Granularidade diária de tudo acima — pra "Ver o dia" (Relatório por
+    # closer) também filtrar o Time de agendamento, não só o resto da página
+    # (pedido do time, 16/09/2026: "não aparece" o histórico do SDR num
+    # período específico).
+    diario_agendador = {
+        'leads_recebidos': leads_dia,
+        'agendamentos': _contar_por_dia(agendamento_deal_ids, _agendamento_dia_by_deal),
+        'realizadas': _contar_por_dia(realizadas_ids, _cc1_dia_by_deal),
+        'no_show': _contar_por_dia(no_show_ids, _no_show_dia_by_deal),
+    }
     meta_agendamentos = leads_n * config.META_AGENDAMENTO_PCT
     meta_realizadas = n_agendamentos * config.META_AGENDADOR_REALIZADA_PCT
     agendadores_out.append({
@@ -229,6 +275,7 @@ for a in config.AGENDADORES:
         # (não recalcula com agendamentos hipotéticos futuros).
         'faltam_agendamentos': max(0, ceil(meta_agendamentos - n_agendamentos)),
         'faltam_realizadas': max(0, ceil(meta_realizadas - realizadas_n)),
+        'diario': diario_agendador,
     })
 agendadores_meta = {
     'meta_agendamento_pct': round(config.META_AGENDAMENTO_PCT * 100),
@@ -622,17 +669,20 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     HEATMAP_DIAS = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta']
     HEATMAP_HORAS = list(range(9, 21))
     heatmap_matriz = [[0] * len(HEATMAP_HORAS) for _ in HEATMAP_DIAS]
+    heatmap_detalhe = []  # (data, hora) de cada CC1 — pra "Ver o dia" recalcular só daquele dia
     if not cc1_p.empty and 'marked_as_done_time' in cc1_p.columns:
         hm = cc1_p.copy()
         hm['marked_as_done_time'] = pd.to_datetime(hm['marked_as_done_time'], errors='coerce')
         for _, r in hm.dropna(subset=['marked_as_done_time']).iterrows():
             wd = r['marked_as_done_time'].weekday()
-            if wd > 4:
-                continue
             hora = r['marked_as_done_time'].hour
             if hora in HEATMAP_HORAS:
+                heatmap_detalhe.append({'data': r['marked_as_done_time'].date().isoformat(), 'hora': hora})
+            if wd > 4:
+                continue
+            if hora in HEATMAP_HORAS:
                 heatmap_matriz[wd][HEATMAP_HORAS.index(hora)] += 1
-    heatmap_cc1 = {'dias': HEATMAP_DIAS, 'horas': HEATMAP_HORAS, 'matriz': heatmap_matriz}
+    heatmap_cc1 = {'dias': HEATMAP_DIAS, 'horas': HEATMAP_HORAS, 'matriz': heatmap_matriz, 'detalhe': heatmap_detalhe}
 
     # ============= FPQS RECEBIDAS (lista, com link pro Pipedrive) =============
     fpqs_recebidas = []

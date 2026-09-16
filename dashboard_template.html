@@ -394,6 +394,7 @@
           </tr>
         </thead>
         <tbody></tbody>
+        <tfoot></tfoot>
       </table>
     </div>
   </div>
@@ -1495,6 +1496,34 @@ function renderAgendadores(lista, diaMode) {
     </tr>
   `;
   }).join('');
+
+  // Total do time — mesmas contas de cada linha, só que em cima da soma bruta
+  // (não a média dos %), igual o "Total da equipe" do Relatório por closer.
+  const t = { leads_recebidos: 0, agendamentos: 0, realizadas: 0, no_show: 0, faltam_agendamentos: 0, faltam_realizadas: 0 };
+  lista.forEach(a => {
+    t.leads_recebidos += a.leads_recebidos; t.agendamentos += a.agendamentos;
+    t.realizadas += a.realizadas; t.no_show += a.no_show;
+    t.faltam_agendamentos += a.faltam_agendamentos || 0; t.faltam_realizadas += a.faltam_realizadas || 0;
+  });
+  t.pct_agendamento = t.leads_recebidos ? Math.round(1000 * t.agendamentos / t.leads_recebidos) / 10 : null;
+  t.pct_realizada = t.agendamentos ? Math.round(1000 * t.realizadas / t.agendamentos) / 10 : null;
+  t.pct_no_show = t.agendamentos ? Math.round(1000 * t.no_show / t.agendamentos) / 10 : null;
+  const faltasTotal = [];
+  if (t.faltam_agendamentos > 0) faltasTotal.push(`${t.faltam_agendamentos} agendamento${t.faltam_agendamentos === 1 ? '' : 's'}`);
+  if (t.faltam_realizadas > 0) faltasTotal.push(`${t.faltam_realizadas} realizada${t.faltam_realizadas === 1 ? '' : 's'}`);
+  const faltaTotalTxt = diaMode ? '—' : (faltasTotal.length ? faltasTotal.join(' · ') : '<span style="color:var(--green)">em dia</span>');
+  document.querySelector('#agendadores-table tfoot').innerHTML = `
+    <tr class="relatorio-total">
+      <td>Total</td>
+      <td>${t.leads_recebidos}</td>
+      <td>${t.agendamentos}</td>
+      ${pctCell(t.pct_agendamento, D.agendadores_meta && D.agendadores_meta.meta_agendamento_pct)}
+      <td>${t.realizadas}</td>
+      ${pctCell(t.pct_realizada, D.agendadores_meta && D.agendadores_meta.meta_realizada_pct)}
+      <td>${t.no_show}</td>
+      <td>${t.pct_no_show === null ? '—' : t.pct_no_show + '%'}</td>
+      <td>${faltaTotalTxt}</td>
+    </tr>`;
 }
 renderAgendadores(D.agendadores, false);
 

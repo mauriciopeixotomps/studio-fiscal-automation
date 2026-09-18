@@ -805,6 +805,49 @@ const todayLinePlugin = {
   }
 };
 
+// Igual ao drawCheckpointMarker acima, mas genérico pra N linhas reais (sem
+// "ideal") — usado no gráfico comparativo Leads x Perdidos x Reuniões
+// realizadas (pedido do time, 18/09/2026: "marcados de valor por dia").
+function drawCheckpointMarkerMulti(ctx, chartArea, scales, data, idx, isToday) {
+  const x = scales.x.getPixelForValue(idx);
+  if (x < chartArea.left || x > chartArea.right) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(x, chartArea.top);
+  ctx.lineTo(x, chartArea.bottom);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = isToday ? 'rgba(248,250,252,.45)' : 'rgba(148,163,184,.25)';
+  ctx.setLineDash(isToday ? [3, 3] : [2, 3]);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  if (isToday) {
+    ctx.fillStyle = 'rgba(248,250,252,.7)';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('hoje', x, chartArea.top - 3);
+  }
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 9px sans-serif';
+  data.datasets.forEach((ds, i) => {
+    const val = ds.data?.[idx];
+    if (val === undefined || val === null) return;
+    const y = scales.y.getPixelForValue(val);
+    ctx.fillStyle = ds.borderColor;
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText(String(Math.round(val)), x, i % 2 === 0 ? y - 7 : y + 12);
+  });
+  ctx.restore();
+}
+const comparativoLinePlugin = {
+  id: 'comparativoLine',
+  afterDraw(chart) {
+    const { ctx, chartArea, scales, data } = chart;
+    CHECKPOINT_INDEXES.forEach(idx => drawCheckpointMarkerMulti(ctx, chartArea, scales, data, idx, idx === TODAY_INDEX));
+  }
+};
+
 document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => {
   const color = PACE_COLORS[key] || '#d5ae77';
   const p = D.pace[key];
@@ -889,11 +932,12 @@ paceCharts.push(new Chart(document.getElementById('pace-canvas-comparativo'), {
   data: {
     labels: paceLabels,
     datasets: [
-      { label: 'Leads gerados', data: cumulativeFromDaily(D.pace.leads.daily), borderColor: '#3b82f6', backgroundColor: '#3b82f633', tension: .3, pointRadius: 0, fill: false },
-      { label: 'Leads perdidos', data: cumulativeFromDaily(diarioDePerdidos()), borderColor: '#ef4444', backgroundColor: '#ef444433', tension: .3, pointRadius: 0, fill: false },
-      { label: 'Reuniões realizadas', data: cumulativeFromDaily(D.pace.cc1.daily), borderColor: '#22c55e', backgroundColor: '#22c55e33', tension: .3, pointRadius: 0, fill: false },
+      { label: 'Leads gerados', data: cumulativeFromDaily(D.pace.leads.daily), borderColor: '#3b82f6', backgroundColor: '#3b82f633', tension: .3, pointRadius: 0, fill: true },
+      { label: 'Leads perdidos', data: cumulativeFromDaily(diarioDePerdidos()), borderColor: '#ef4444', backgroundColor: '#ef444433', tension: .3, pointRadius: 0, fill: true },
+      { label: 'Reuniões realizadas', data: cumulativeFromDaily(D.pace.cc1.daily), borderColor: '#22c55e', backgroundColor: '#22c55e33', tension: .3, pointRadius: 0, fill: true },
     ],
   },
+  plugins: [comparativoLinePlugin],
   options: {
     responsive: true, maintainAspectRatio: false,
     layout: { padding: { top: 16, bottom: 4 } },

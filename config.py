@@ -52,7 +52,7 @@ CLOSERS = [
         'id': 25500365,
         'nome': 'Luciana Issler',
         'email': 'luciana.issler@grupostudio.com.br',
-        'foto': 'https://usericons.pipedrive.com/profile_120x120_25500365_4489819785fd00c507f273ac2dbf8339.jpg',
+        'foto': 'https://usericons.pipedrive.com/profile_120x120_25500365_d2313a12bf3bfa0b46a219c8371cb14e.jpg',
         'apelidos_planilha': {'luciana', 'luciana issler', 'luciana krewer issler'},
     },
 ]

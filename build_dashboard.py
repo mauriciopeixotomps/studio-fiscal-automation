@@ -735,7 +735,15 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     # um negócio morto não é mais uma previsão de venda futura (09-10/09/2026,
     # casos reais: Nilza, Alberto Moron, Daniel Thiago).
     previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won' and not _prev_perdido(r)]
+    # Previsto por TIPO de contrato (21/09/2026): o alvo principal é Franquia, não
+    # dá pra somar Franquia com Partner (de graça) num número só. "Pendente" =
+    # ainda em aberto na planilha (não Ganho, não Perdido); linha sem tipo
+    # (sem produto nem Modelo) conta como Franquia. O front soma com o
+    # Realizado de cada tipo pra montar "Previsto" e "faltam".
+    _pend_partner = [r for r in previsao_pendente if r.get('tipo_contrato') == 'partner']
     scoreboard_previsto = {
+        'contratos_previstos_franquia': len(previsao_pendente) - len(_pend_partner),
+        'contratos_previstos_partner': len(_pend_partner),
         'contratos_previstos': len(previsao_pendente),
         'venda_prevista_total': sum(r.get('venda') or 0 for r in previsao_pendente),
         'caixa_prevista_total': sum(r.get('caixa') or 0 for r in previsao_pendente),

@@ -643,18 +643,33 @@ function tipoContratoTxt(franquia, partner, fmt) {
 // do MÊS inteiro; a quebra de dinheiro por tipo não é somada por dia, só por
 // mês inteiro). A quebra de CONTAGEM (nº de contratos) continua, essa sim
 // existe por dia. Ver aplicarFiltroDia() (pedido do time, 13/09/2026).
+// Linha "Franquia: X fechados · previsto Y · faltam Z" — Previsto = o que já
+// fechou + o que ainda está em aberto na planilha (não Perdido); faltam = só o
+// que ainda está em aberto. Separado por tipo porque o alvo principal é
+// Franquia (Partner é de graça, não dá pra somar tudo num número só) — pedido
+// do time, 21/09/2026.
+function scoreTipoLinha(label, fechados, pendentes) {
+  const previsto = fechados + pendentes;
+  const cls = pendentes > 0 ? 'pendente' : 'completo';
+  return `<div>${label}: <b>${fechados}</b> fechado${fechados === 1 ? '' : 's'} · previsto <b>${previsto}</b> · faltam <span class="falta ${cls}">${pendentes}</span></div>`;
+}
 function renderScoreboard(sb, diaMode) {
   document.getElementById('score-contratos').textContent = sb.contratos_fechados;
   document.getElementById('score-venda').textContent = fmtMoney(sb.venda_realizada_total);
   document.getElementById('score-caixa').textContent = fmtMoney(sb.caixa_realizado_total);
-  document.getElementById('score-contratos-sub').innerHTML =
-    diaMode ? '' : scoreSubHtml(sb.contratos_previstos, sb.contratos_fechados, v => v);
+  const semTipo = sb.contratos_fechados - (sb.contratos_fechados_franquia || 0) - (sb.contratos_fechados_partner || 0);
+  document.getElementById('score-contratos-sub').innerHTML = diaMode ? '' :
+    scoreTipoLinha('Franquia', sb.contratos_fechados_franquia || 0, sb.contratos_previstos_franquia || 0) +
+    scoreTipoLinha('Partner', sb.contratos_fechados_partner || 0, sb.contratos_previstos_partner || 0);
+  // Venda/Caixa: previsto = realizado + o que ainda está em aberto (antes
+  // usava só o em aberto, e "faltam" subtraía o realizado de novo).
   document.getElementById('score-venda-sub').innerHTML =
-    diaMode ? '' : scoreSubHtml(sb.venda_prevista_total, sb.venda_realizada_total, fmtMoney);
+    diaMode ? '' : scoreSubHtml(sb.venda_realizada_total + sb.venda_prevista_total, sb.venda_realizada_total, fmtMoney);
   document.getElementById('score-caixa-sub').innerHTML =
-    diaMode ? '' : scoreSubHtml(sb.caixa_prevista_total, sb.caixa_realizado_total, fmtMoney);
-  document.getElementById('score-contratos-tipo').textContent =
-    tipoContratoTxt(sb.contratos_fechados_franquia, sb.contratos_fechados_partner, v => v);
+    diaMode ? '' : scoreSubHtml(sb.caixa_realizado_total + sb.caixa_prevista_total, sb.caixa_realizado_total, fmtMoney);
+  document.getElementById('score-contratos-tipo').textContent = diaMode
+    ? tipoContratoTxt(sb.contratos_fechados_franquia, sb.contratos_fechados_partner, v => v)
+    : (semTipo > 0 ? `+ ${semTipo} sem produto vinculado no Pipedrive` : '');
   document.getElementById('score-venda-tipo').textContent =
     diaMode ? '' : tipoContratoTxt(sb.venda_realizada_franquia, sb.venda_realizada_partner, fmtMoney);
   document.getElementById('score-caixa-tipo').textContent =

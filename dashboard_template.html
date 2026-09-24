@@ -484,7 +484,7 @@
       <table id="previsao-table">
         <thead>
           <tr>
-            <th>Data registro</th><th>Closer</th><th>Funil</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th>
+            <th>Data registro</th><th>Closer</th><th>Funil</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th><th>Prob.</th>
             <th>Venda</th><th>Caixa</th><th>Fechamento esperado</th><th>Status</th>
             <th>Venda realizada</th><th>Caixa realizado</th><th>Deal</th>
           </tr>
@@ -1475,6 +1475,17 @@ fpqCloserFilter.innerHTML = '<option value="">Todos</option>' +
 fpqCloserFilter.addEventListener('change', () => fpqRenderTable(fpqCloserFilter.value));
 fpqRenderTable('');
 
+// Probabilidade preenchida no negócio do Pipedrive (0-100). Ganho = 100%;
+// Perdido = 0%; aberto sem probabilidade fica "—" e fora do total ponderado.
+function probEfetiva(r) {
+  if (r.deal_status === 'won') return 100;
+  if (previsaoPerdido(r)) return 0;
+  return (r.probabilidade === null || r.probabilidade === undefined) ? null : Number(r.probabilidade);
+}
+function probCell(r) {
+  const p = probEfetiva(r);
+  return p === null ? '—' : `${p}%`;
+}
 const tbody = document.querySelector('#previsao-table tbody');
 tbody.innerHTML = D.previsao.map(r => `
   <tr>
@@ -1485,6 +1496,7 @@ tbody.innerHTML = D.previsao.map(r => `
     <td>${r.modelo || '—'}</td>
     <td>${r.bandeira || '—'}</td>
     <td>${confiancaBadge(r.confianca)}</td>
+    <td>${probCell(r)}</td>
     <td>${fmtMoney(r.venda)}</td>
     <td>${fmtMoney(r.caixa)}</td>
     <td>${fmtDate(r.data_fechamento_esperada)}</td>
@@ -1526,12 +1538,35 @@ function porTemperaturaTxt(rows) {
   });
   return Object.entries(contagem).map(([k, n]) => `${n} ${k.charAt(0) + k.slice(1).toLowerCase()}`).join(' · ');
 }
+// Total ponderado: só negócios em aberto (não Ganho/Perdido), venda e caixa
+// multiplicados pela probabilidade do Pipedrive. Aberto sem probabilidade não entra.
+function previsaoPonderado(rows) {
+  const abertos = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r));
+  const comProb = abertos.filter(r => probEfetiva(r) !== null);
+  return {
+    venda: comProb.reduce((a, r) => a + (r.venda || 0) * probEfetiva(r) / 100, 0),
+    caixa: comProb.reduce((a, r) => a + (r.caixa || 0) * probEfetiva(r) / 100, 0),
+    n: comProb.length,
+    semProb: abertos.length - comProb.length,
+  };
+}
+function previsaoPonderadoRowHtml(label, rows) {
+  const t = previsaoPonderado(rows);
+  const aviso = t.semProb ? ` — ${t.semProb} sem probabilidade ficou de fora` : '';
+  return `
+    <tr class="relatorio-total">
+      <td colspan="8">${label} (${t.n} negócio${t.n === 1 ? '' : 's'} em aberto)${aviso}</td>
+      <td>${fmtMoney(t.venda)}</td>
+      <td>${fmtMoney(t.caixa)}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>`;
+}
 function previsaoTotalRowHtml(label, rows, comTemperatura) {
   const t = previsaoSomar(rows);
   const temp = comTemperatura ? porTemperaturaTxt(rows) : '';
   return `
     <tr class="relatorio-total">
-      <td colspan="7">${label} (${rows.length} negócio${rows.length === 1 ? '' : 's'})${temp ? ' — ' + temp : ''}</td>
+      <td colspan="8">${label} (${rows.length} negócio${rows.length === 1 ? '' : 's'})${temp ? ' — ' + temp : ''}</td>
       <td>${fmtMoney(t.venda)}</td>
       <td>${fmtMoney(t.caixa)}</td>
       <td></td>
@@ -1556,7 +1591,10 @@ document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? 
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
   linhasPorFunil +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +
-  previsaoTotalRowHtml('Total geral', D.previsao, true)
+  previsaoTotalRowHtml('Total geral', D.previsao, true) +
+  previsaoPonderadoRowHtml('Total ponderado pela probabilidade', D.previsao) +
+  (funisPresentes.length > 1 ? funisPresentes.map(f => previsaoPonderadoRowHtml(
+    `Ponderado ${f.charAt(0) + f.slice(1).toLowerCase()}`, D.previsao.filter(r => r.funil === f))).join('') : '')
 ) : '';
 
 // ===== Time de agendamento (SDRs dedicados) =====

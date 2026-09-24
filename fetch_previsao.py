@@ -155,10 +155,12 @@ for _, r in df.iterrows():
     caixa_realizado = None
     deal_status = None
     won_time = None
+    probabilidade = None
     if deal_id:
         d = _fetch_deal(deal_id)
         if d:
             deal_status = d.get('status')
+            probabilidade = d.get('probability')
             if deal_status == 'won':
                 venda_realizada = d.get('value')
                 caixa_realizado = d.get(config.CF_CAIXA)
@@ -188,6 +190,7 @@ for _, r in df.iterrows():
         'deal_id': deal_id,
         'deal_link': clean_link or (link if link and link != 'nan' else None),
         'deal_status': deal_status,
+        'probabilidade': probabilidade,
         'venda_realizada': venda_realizada,
         'caixa_realizado': caixa_realizado,
         'won_time': won_time,

@@ -272,7 +272,7 @@ def _fetch_deal_utm(deal_id):
             with urllib.request.urlopen(url, timeout=30) as r:
                 body = json.loads(r.read())
             d = body.get('data') or {}
-            return deal_id, d.get(config.CF_UTM_CAMPAIGN), d.get(config.CF_UTM_CONTENT), d.get('pipeline_id')
+            return deal_id, d.get(config.CF_UTM_CAMPAIGN), d.get(config.CF_UTM_TERM), d.get('pipeline_id')
         except Exception:
             if attempt == 3:
                 return deal_id, None, None, None
@@ -578,7 +578,7 @@ for d in p62_raw + p62_lost:
         'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
         'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
         'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
-        'utm_criativo': d.get(config.CF_UTM_CONTENT),
+        'utm_criativo': d.get(config.CF_UTM_TERM),
         # Sempre string (não deixar o pandas/Excel inferir número) — o campo é
         # multi-select e vem como "97" ou "69,97"; se virasse float perderíamos a
         # comparação exata (97 -> "97.0") e a etiqueta pra achar quem é Studio Fiscal.
@@ -614,7 +614,7 @@ for d in p66_raw + p66_lost:
         'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
         'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
         'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
-        'utm_criativo': d.get(config.CF_UTM_CONTENT),
+        'utm_criativo': d.get(config.CF_UTM_TERM),
     })
 df_p66 = pd.DataFrame(p66_rows)
 df_p66.to_excel(os.path.join(OUT_DIR, 'deals_pipeline66.xlsx'), index=False)
@@ -649,7 +649,7 @@ def _fetch_pipeline_deals(pipeline_id, nome_log):
             'owner_id': owner.get('id') if isinstance(owner, dict) else owner,
             'owner_nome': owner.get('name') if isinstance(owner, dict) else None,
             'utm_campanha': d.get(config.CF_UTM_CAMPAIGN),
-            'utm_criativo': d.get(config.CF_UTM_CONTENT),
+            'utm_criativo': d.get(config.CF_UTM_TERM),
             'label': str(d.get('label')) if d.get('label') is not None else None,
         })
     df = pd.DataFrame(rows)

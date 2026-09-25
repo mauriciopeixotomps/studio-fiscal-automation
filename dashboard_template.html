@@ -441,7 +441,7 @@
         <div class="ranking-cols" id="ranking-campanhas"></div>
       </div>
       <div class="ranking-block">
-        <h4>Criativos (UTM content)</h4>
+        <h4>Criativos (UTM term)</h4>
         <div class="ranking-cols" id="ranking-criativos"></div>
       </div>
     </div>
@@ -556,15 +556,14 @@ if (D.mes_outro_url) {
   monthNav.style.display = '';
 }
 if (!D.tem_meta) {
-  // "Placar do mês" e "Previsão" não dependem de meta nenhuma (Realizado é direto
-  // do Pipedrive, Previsto vem da planilha) — só "Metas do mês" e "Ritmo por
-  // indicador" de fato precisam de um número de meta pra ter sentido (barra de
-  // progresso, linha ideal). Escondia os 4 juntos antes, e um contrato fechado de
-  // verdade na Rebarba ficava invisível por causa disso (01/09/2026).
-  ['card-metas', 'card-ritmo'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.style.display = 'none';
-  });
+  // Só "Metas do mês" precisa de um número de meta (barra de progresso). O
+  // "Ritmo por indicador" continua aparecendo sem meta: mostra o realizado
+  // acumulado de cada indicador, só sem a linha "ideal" (pedido do time,
+  // 25/09/2026, pro painel de Outbound).
+  const elMetas = document.getElementById('card-metas');
+  if (elMetas) elMetas.style.display = 'none';
+  const hintRitmo = document.querySelector('#card-ritmo h2 .hint');
+  if (hintRitmo) hintRitmo.textContent = '— acumulado no mês (sem meta definida nesta página, então sem linha de ritmo ideal)';
 }
 
 // ===== Exportar página (imagem / PDF) =====
@@ -876,7 +875,7 @@ document.getElementById('pace-grid').innerHTML = Object.keys(D.pace).map(key => 
   return `
   <div class="pace-card">
     <div class="pace-head">
-      <div class="pace-title">${p.label}${p.estimado ? '<span class="pace-tag">estimado</span>' : ''}</div>
+      <div class="pace-title">${p.label}${(p.estimado && p.meta) ? '<span class="pace-tag">estimado</span>' : ''}</div>
       <div class="pace-nums"><b>${realHoje}</b> ${p.meta ? '/ ' + p.meta : ''}</div>
     </div>
     <div class="pace-legend">

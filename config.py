@@ -194,7 +194,7 @@ CF_CAIXA = 'a11287b4a40b38a06e050e24b1bbc78e91a6da53'
 
 # Campos customizados de negócio: origem UTM (campanha/criativo de marketing)
 CF_UTM_CAMPAIGN = 'ee93fbc62c1804b82721486630058f3467651cec'
-CF_UTM_CONTENT = '6673bb1656201df819dcd47be1cf751a966d2229'
+CF_UTM_TERM = '1f0cdcf753543bcca8b7a39baf0805c12db7f3bb'  # criativo (UTM term); o UTM content é o conjunto/público
 
 # Etiqueta (campo "label" nativo do Pipedrive, multi-select) que a Qualificadora usa
 # pra marcar um negócio como sendo da Studio Fiscal — id 97 "Lead Studio Fiscal"

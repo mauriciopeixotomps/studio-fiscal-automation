@@ -724,10 +724,13 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         return r.get('deal_status') == 'lost' or 'perdid' in str(r.get('confianca') or '').lower()
 
     def _prev_ordem(r):
-        # Ganhos e Perdidos aglutinados no topo; o resto (pipeline vivo) logo
-        # abaixo, ordenado pela data de fechamento esperada (sem data vai pro
-        # fim). Pedido do time (10/09/2026).
-        grupo = 0 if r.get('deal_status') == 'won' else (1 if _prev_perdido(r) else 2)
+        # Ganhos e Perdidos sempre no topo, MISTURADOS no mesmo grupo (não dois
+        # blocos separados) e ordenados pela data de fechamento esperada, do
+        # menor pro maior; o resto (pipeline vivo) logo abaixo, também por
+        # data. Sem data vai pro fim do seu grupo. Pedido do time (28/09/2026):
+        # antes Ganhos e Perdidos formavam dois blocos (todo Ganho antes de
+        # todo Perdido) — agora entram juntos, ordenados só pela data.
+        grupo = 0 if (r.get('deal_status') == 'won' or _prev_perdido(r)) else 1
         return (grupo, r.get('data_fechamento_esperada') or '9999-12-31')
 
     previsao_funil = sorted(previsao_funil, key=_prev_ordem)

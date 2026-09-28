@@ -724,20 +724,38 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         return r.get('deal_status') == 'lost' or 'perdid' in str(r.get('confianca') or '').lower()
 
     def _prev_ordem(r):
-        # Ganhos e Perdidos sempre no topo, MISTURADOS no mesmo grupo (não dois
-        # blocos separados) e ordenados pela data de fechamento esperada, do
-        # menor pro maior; o resto (pipeline vivo) logo abaixo, também por
-        # data. Sem data vai pro fim do seu grupo. Pedido do time (28/09/2026):
-        # antes Ganhos e Perdidos formavam dois blocos (todo Ganho antes de
-        # todo Perdido) — agora entram juntos, ordenados só pela data.
-        grupo = 0 if (r.get('deal_status') == 'won' or _prev_perdido(r)) else 1
+        # Três blocos, nessa ordem: Ganhos, depois Perdidos, depois o resto
+        # (pipeline vivo) — dentro de cada bloco, por data de fechamento
+        # esperada do menor pro maior (sem data vai pro fim do bloco). Pedido
+        # do time (28/09/2026, revertendo a tentativa anterior de misturar
+        # Ganho+Perdido num bloco só).
+        grupo = 0 if r.get('deal_status') == 'won' else (1 if _prev_perdido(r) else 2)
         return (grupo, r.get('data_fechamento_esperada') or '9999-12-31')
 
     previsao_funil = sorted(previsao_funil, key=_prev_ordem)
+
+    def _prev_proximo_mes(r):
+        # Negócio com data de fechamento esperada JÁ EMPURRADA pro mês
+        # seguinte não deveria inflar o "previsto" deste mês (o time claramente
+        # não espera mais fechar isso agora) — pedido do time (28/09/2026,
+        # casos reais: Bruna Bressani e Cyro Neto com fechamento esperado em
+        # outubro, aparecendo somados no total de setembro).
+        d = r.get('data_fechamento_esperada')
+        return bool(d) and str(d) > config.MONTH_END.isoformat()
+
     # Negócio Ganho OU Perdido não conta no "previsto" (venda/caixa/contratos) —
     # um negócio morto não é mais uma previsão de venda futura (09-10/09/2026,
-    # casos reais: Nilza, Alberto Moron, Daniel Thiago).
-    previsao_pendente = [r for r in previsao_funil if r.get('deal_status') != 'won' and not _prev_perdido(r)]
+    # casos reais: Nilza, Alberto Moron, Daniel Thiago). Postergado pro mês
+    # seguinte também sai do "previsto" deste mês (vira sua própria lista,
+    # 'previsao_postergada', só pra mostrar/somar à parte).
+    previsao_pendente = [
+        r for r in previsao_funil
+        if r.get('deal_status') != 'won' and not _prev_perdido(r) and not _prev_proximo_mes(r)
+    ]
+    previsao_postergada = [
+        r for r in previsao_funil
+        if r.get('deal_status') != 'won' and not _prev_perdido(r) and _prev_proximo_mes(r)
+    ]
     # Previsto por TIPO de contrato (21/09/2026): o alvo principal é Franquia, não
     # dá pra somar Franquia com Partner (de graça) num número só. "Pendente" =
     # ainda em aberto na planilha (não Ganho, não Perdido); linha sem tipo

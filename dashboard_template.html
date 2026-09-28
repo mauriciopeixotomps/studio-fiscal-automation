@@ -1548,13 +1548,22 @@ function previsaoPerdido(r) {
   // (às vezes marca antes do Pipedrive, ou o negócio nem tem link válido).
   return r.deal_status === 'lost' || /perdid/i.test((r.confianca || '').toString());
 }
+// Negócio com fechamento esperado depois do fim deste mês — o time empurrou
+// pra frente, não é mais uma previsão DESTE mês. Sai dos totais de "previsto"
+// (soma parte pra sua própria linha "Postergado pro próximo mês"). Pedido do
+// time (28/09/2026, casos reais: Bruna Bressani e Cyro Neto em outubro
+// aparecendo somados no total de setembro).
+function previsaoProximoMes(r) {
+  return !!r.data_fechamento_esperada && r.data_fechamento_esperada > D.periodo_fim;
+}
 function previsaoSomar(rows) {
   return rows.reduce((acc, r) => {
     // Negócio já Ganho não conta como "previsto" (venda/caixa) — já virou
     // passado, e já está somado do lado do realizado. Negócio Perdido também
     // sai da soma (09-10/09/2026, casos reais: Nilza, Alberto Moron, Daniel
     // Thiago) — um negócio morto não é mais previsão de venda futura.
-    if (r.deal_status !== 'won' && !previsaoPerdido(r)) {
+    // Postergado pro próximo mês também sai (ver previsaoProximoMes).
+    if (r.deal_status !== 'won' && !previsaoPerdido(r) && !previsaoProximoMes(r)) {
       acc.venda += r.venda || 0;
       acc.caixa += r.caixa || 0;
     }
@@ -1577,7 +1586,7 @@ function porTemperaturaTxt(rows) {
 // Total ponderado: só negócios em aberto (não Ganho/Perdido), venda e caixa
 // multiplicados pela probabilidade do Pipedrive. Aberto sem probabilidade não entra.
 function previsaoPonderado(rows) {
-  const abertos = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r));
+  const abertos = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r) && !previsaoProximoMes(r));
   const comProb = abertos.filter(r => probEfetiva(r) !== null);
   return {
     venda: comProb.reduce((a, r) => a + (r.venda || 0) * probEfetiva(r) / 100, 0),
@@ -1612,8 +1621,21 @@ function previsaoTotalRowHtml(label, rows, comTemperatura) {
       <td></td>
     </tr>`;
 }
-const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(confiancaEfetiva(r)) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won');
+const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(confiancaEfetiva(r)) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won' && !previsaoProximoMes(r));
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
+function previsaoPostergadoRowHtml(rows) {
+  const postergados = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r) && previsaoProximoMes(r));
+  if (!postergados.length) return '';
+  const venda = postergados.reduce((a, r) => a + (r.venda || 0), 0);
+  const caixa = postergados.reduce((a, r) => a + (r.caixa || 0), 0);
+  return `
+    <tr class="relatorio-total">
+      <td colspan="8">Postergado pro próximo mês (${postergados.length} negócio${postergados.length === 1 ? '' : 's'}) — fechamento esperado depois deste mês, não soma no previsto</td>
+      <td>${fmtMoney(venda)}</td>
+      <td>${fmtMoney(caixa)}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>`;
+}
 // Uma linha "Total {Funil}" por funil presente — só faz sentido quando a lista
 // junta mais de um (Inbound a partir de 01/09/2026); nas páginas que só têm o
 // próprio funil (Outbound/Rebarba) isso dá 1 funil só, igual ao "Total geral",
@@ -1628,6 +1650,7 @@ document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? 
   linhasPorFunil +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +
   previsaoTotalRowHtml('Total geral', D.previsao, true) +
+  previsaoPostergadoRowHtml(D.previsao) +
   previsaoPonderadoRowHtml('Total ponderado pela probabilidade', D.previsao) +
   (funisPresentes.length > 1 ? funisPresentes.map(f => previsaoPonderadoRowHtml(
     `Ponderado ${f.charAt(0) + f.slice(1).toLowerCase()}`, D.previsao.filter(r => r.funil === f))).join('') : '')

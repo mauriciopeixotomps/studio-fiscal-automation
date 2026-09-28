@@ -221,6 +221,8 @@
   .badge.confianca-morno { background: rgba(249,115,22,.15); color: var(--orange); }
   .badge.confianca-frio { background: rgba(56,189,248,.15); color: var(--blue); }
   .badge.confianca-em-duvida { background: rgba(239,68,68,.15); color: var(--red); }
+  .data-atrasada { color: var(--orange); font-weight: 700; }
+  .atraso-tag { display: inline-block; margin-left: 5px; font-size: 10px; font-weight: 700; color: var(--orange); cursor: default; }
   a.link { color: var(--accent); text-decoration: none; }
   a.link:hover { text-decoration: underline; }
 
@@ -1050,6 +1052,8 @@ document.getElementById('compare-grid').innerHTML = D.closers.map((c, i) => `
     <div class="funnel" id="compare-funnel-${i}"></div>
     <div class="compare-kpis">
       <div class="m"><div class="v">${c.contratos}</div><div class="l">Contratos</div></div>
+      <div class="m"><div class="v">${c.contratos_franquia}</div><div class="l">Ganho Franquia</div></div>
+      <div class="m"><div class="v">${c.contratos_partner}</div><div class="l">Ganho Partner</div></div>
     </div>
   </div>
 `).join('');
@@ -1446,10 +1450,43 @@ function confiancaCategoria(v) {
     : norm.includes('frio') ? 'frio'
     : null;
 }
-function confiancaBadge(v) {
-  if (!v) return '—';
-  const cls = confiancaCategoria(v);
-  return cls ? `<span class="badge confianca-${cls}">${v}</span>` : v;
+// Dias corridos entre a data de fechamento esperada e hoje (0 se ainda não
+// passou, ou se o negócio já é Ganho/Perdido — aí a data esperada é passado,
+// não faz sentido sinalizar atraso). Pedido do time (28/09/2026).
+function diasAtraso(r) {
+  if (!r.data_fechamento_esperada || r.deal_status === 'won' || previsaoPerdido(r)) return 0;
+  const esperada = new Date(r.data_fechamento_esperada + 'T00:00:00');
+  const hoje = new Date(TODAY_ISO + 'T00:00:00');
+  const dias = Math.round((hoje - esperada) / 86400000);
+  return dias > 0 ? dias : 0;
+}
+// A partir de 2 dias de atraso, a Confiança cai um nível (Quente -> Morno ->
+// Frio) até o negócio ser atualizado — sinaliza que o closer não bateu a
+// própria previsão de data. Frio não cai mais (não existe nível abaixo, só
+// Perdido, que é um estado à parte, não automático por atraso). Recalculado
+// toda vez que a página carrega (nunca escreve na planilha): se a data for
+// adiada ou o negócio evoluir, volta ao normal sozinho.
+const DOWNGRADE_CONFIANCA = { quente: 'morno', morno: 'frio' };
+function confiancaEfetiva(r) {
+  const original = (r.confianca || '').toString();
+  if (diasAtraso(r) < 2) return original;
+  const novaCat = DOWNGRADE_CONFIANCA[confiancaCategoria(original)];
+  return novaCat ? novaCat.toUpperCase() : original;
+}
+function confiancaBadge(r) {
+  const original = (r.confianca || '').toString();
+  if (!original) return '—';
+  const efetiva = confiancaEfetiva(r);
+  const cls = confiancaCategoria(efetiva);
+  const badge = cls ? `<span class="badge confianca-${cls}">${efetiva}</span>` : efetiva;
+  if (efetiva === original) return badge;
+  return `${badge}<span class="atraso-tag" title="Era ${original} — caiu por estar ${diasAtraso(r)} dias sem bater a data de fechamento esperada">▼</span>`;
+}
+function dataEsperadaCell(r) {
+  const txt = fmtDate(r.data_fechamento_esperada);
+  const atraso = diasAtraso(r);
+  if (atraso < 1) return txt;
+  return `<span class="data-atrasada" title="${atraso} dia${atraso === 1 ? '' : 's'} sem bater a data de fechamento esperada">${txt} ⚠</span>`;
 }
 const fpqTbody = document.querySelector('#fpq-table tbody');
 let fpqDiaFiltro = null; // setado por aplicarFiltroDia/limparFiltroDia
@@ -1494,11 +1531,11 @@ tbody.innerHTML = D.previsao.map(r => `
     <td>${r.lead || '—'}</td>
     <td>${r.modelo || '—'}</td>
     <td>${r.bandeira || '—'}</td>
-    <td>${confiancaBadge(r.confianca)}</td>
+    <td>${confiancaBadge(r)}</td>
     <td>${probCell(r)}</td>
     <td>${fmtMoney(r.venda)}</td>
     <td>${fmtMoney(r.caixa)}</td>
-    <td>${fmtDate(r.data_fechamento_esperada)}</td>
+    <td>${dataEsperadaCell(r)}</td>
     <td>${r.deal_status === 'won' ? '<span class="badge won">Ganho</span>' : r.deal_status === 'lost' ? '<span class="badge lost">Perdido</span>' : (r.status || '—')}</td>
     <td>${fmtMoney(r.venda_realizada)}</td>
     <td>${fmtMoney(r.caixa_realizado)}</td>
@@ -1531,7 +1568,7 @@ function previsaoSomar(rows) {
 function porTemperaturaTxt(rows) {
   const contagem = {};
   rows.forEach(r => {
-    const v = (r.confianca || '').toString().trim();
+    const v = confiancaEfetiva(r).trim();
     if (!v) return;
     contagem[v] = (contagem[v] || 0) + 1;
   });
@@ -1575,7 +1612,7 @@ function previsaoTotalRowHtml(label, rows, comTemperatura) {
       <td></td>
     </tr>`;
 }
-const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(r.confianca) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won');
+const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(confiancaEfetiva(r)) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won');
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
 // Uma linha "Total {Funil}" por funil presente — só faz sentido quando a lista
 // junta mais de um (Inbound a partir de 01/09/2026); nas páginas que só têm o

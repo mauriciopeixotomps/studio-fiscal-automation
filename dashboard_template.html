@@ -999,6 +999,14 @@ function funnelStages(m) {
     ['CC3 realizada', m.cc3_realizada, m.conversao.cc2_para_cc3],
     ['Contrato enviado', m.contrato_enviado, undefined],
     ['Fechados (Ganho)', m.contratos, undefined],
+    // Franquia (tem valor) x Partner (de graça) dentro do próprio funil — só
+    // quando o objeto trouxer essa quebra (consolidado e comparativo por
+    // closer trazem; outros funis podem não trazer). Pedido do time
+    // (28/09/2026): ver de cara quanto do "Fechados" é Franquia x Partner.
+    ...(m.contratos_franquia === undefined ? [] : [
+      ['Fechados Franquia', m.contratos_franquia, undefined],
+      ['Fechados Partner', m.contratos_partner, undefined],
+    ]),
   ];
 }
 function renderFunnel(elId, m) {

@@ -509,9 +509,26 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         daily_leads = {}
         if not deals_p.empty and 'label' in deals_p.columns:
             d = deals_p.copy()
-            d['add_time'] = pd.to_datetime(d['add_time'], errors='coerce').dt.date
+            add_time_dt = pd.to_datetime(d['add_time'], errors='coerce')
             tem_etiqueta = d['label'].apply(_tem_etiqueta)
-            for day in d.loc[tem_etiqueta, 'add_time'].dropna():
+            # Negócio ANTIGO que uma automação (ex: n8n) reabre/reseta pra etapa
+            # inicial e/ou marca com a etiqueta "Lead Studio Fiscal" muito tempo
+            # depois de criado não é um lead NOVO — mesmo com add_time dentro do
+            # mês, ele nunca tinha contado até esse reset, e reaparece de uma vez
+            # só inflando o total retroativamente. Caso real (29/09/2026): 202
+            # negócios de agosto/início de setembro, todos resetados pra etapa
+            # "LEAD" no mesmo minuto, só então passando no filtro. Lead genuíno
+            # tem a troca de etapa bem perto da criação (mesmo dia); gap grande
+            # entre add_time e a entrada na etapa atual = reativação, não
+            # geração nova.
+            if 'stage_change_time' in d.columns:
+                stage_change_dt = pd.to_datetime(d['stage_change_time'], errors='coerce')
+                gap_dias = (stage_change_dt - add_time_dt).dt.days
+                nao_reativado = gap_dias.isna() | (gap_dias.abs() <= 7)
+            else:
+                nao_reativado = True
+            d['add_time'] = add_time_dt.dt.date
+            for day in d.loc[tem_etiqueta & nao_reativado, 'add_time'].dropna():
                 if config.MONTH_START <= day <= config.MONTH_END:
                     daily_leads[day.isoformat()] = daily_leads.get(day.isoformat(), 0) + 1
         consolidado['leads'] = sum(daily_leads.values())

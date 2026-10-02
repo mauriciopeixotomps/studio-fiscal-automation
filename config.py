@@ -65,11 +65,6 @@ CLOSER_IDS = [c['id'] for c in CLOSERS]
 # deles (leads recebidos / agendamentos / realizadas).
 AGENDADORES = [
     {
-        'id': 24196535,
-        'nome': 'Lorenzo Meneghetti',
-        'email': 'lorenzo.meneghetti@grupostudio.com.br',
-    },
-    {
         'id': 24560514,
         'nome': 'Jonatans Junior',
         'email': 'jonatans.junior@grupostudio.com.br',

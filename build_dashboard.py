@@ -872,7 +872,11 @@ outbound_data = build_page(
     stages_contrato_enviado=[config.PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND, config.PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS],
     leads_mode='criado',
     meta_leads=None,
-    meta_contratos_val=None,
+    # Meta combinada (Circular 13/2026 + acordo com Adalberto, 05/10/2026): 1
+    # Franquia + 10 Partner = 11 contratos/mês — só pra popular o card
+    # "Contratos fechados" do Ritmo (não ativa "Metas do mês", que depende de
+    # meta_leads).
+    meta_contratos_val=config.META_CONTRATOS_OUTBOUND_FRANQUIA + config.META_CONTRATOS_OUTBOUND_PARTNER,
     tem_meta=False,
     funil_nome='OUTBOUND',
 )

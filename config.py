@@ -269,3 +269,10 @@ FUNIL_POR_PIPELINE = {
     PIPELINE_OUTBOUND_STUDIO_FISCAL: 'OUTBOUND',
     PIPELINE_OUTBOUND_EVENTOS: 'OUTBOUND',
 }
+
+# ============= META OUTBOUND (definida com Adalberto, 05/10/2026) =============
+# Meta inicial do time de Outbound: 10 contratos Partner + 1 Franquia por mês.
+# Só alimenta o card "Contratos fechados" do Ritmo na página Outbound (a página
+# continua sem "Metas do mês" geral, tem_meta=False, por não ter meta de leads).
+META_CONTRATOS_OUTBOUND_FRANQUIA = 1
+META_CONTRATOS_OUTBOUND_PARTNER = 10

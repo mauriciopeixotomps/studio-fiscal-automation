@@ -223,12 +223,20 @@ DEALS_EXCLUIDOS = {57206, 84764, 92183, 95176}
 PREVISAO_EXCLUIDOS = {90987}
 
 # ============= CONVERSÃO DE REFERÊNCIA (quadro do time, "conta pra cada contrato") =============
-# 100 leads -> 15 CC1 realizada -> 8 FPQ -> 4 CC2 -> 2 CC3 -> 1 contrato fechado.
 # Usado pra estimar as metas de CC1/FPQ/CC2/CC3 em cascata a partir da meta de leads,
 # em vez da conversão real do mês corrente (que fica instável/ruidosa no início do mês,
 # com poucos dados). Contrato enviado não está no quadro — continua sendo estimado pela
 # conversão real do mês (CC3 -> Contrato enviado).
-BENCHMARK_LEADS_PARA_CC1 = 15 / 100
+# Leads -> CC1 realizada = a mesma taxa oficial da Circular 002/2026 (Política de
+# Remuneração Variável - OTE, Equipe de Expansão, vigência 01/09/2026): o SDR só valida
+# 1 UP com os dois indicadores batidos ao mesmo tempo (30% leads->CC1 Agendada E 65%
+# CC1 Agendada->CC1 Realizada) — mesma conta de META_AGENDAMENTO_PCT/
+# META_AGENDADOR_REALIZADA_PCT acima, pra Ritmo e tabela de SDR nunca ficarem
+# dessincronizados (04/10/2026, antes era um 15% solto, sem vínculo com a circular).
+BENCHMARK_LEADS_PARA_CC1 = META_AGENDAMENTO_PCT * META_AGENDADOR_REALIZADA_PCT
+# CC1 -> FPQ -> CC2 -> CC3: a circular não define esses indicadores (só cobre
+# Qualificador/Closer/Gerente/Gestor por UP de Franquia+Caixa) — mantém o quadro
+# histórico do time: 8 FPQ -> 4 CC2 -> 2 CC3 (a partir de 15 CC1 realizada).
 BENCHMARK_CC1_PARA_FPQ = 8 / 15
 BENCHMARK_FPQ_PARA_CC2 = 4 / 8
 BENCHMARK_CC2_PARA_CC3 = 2 / 4

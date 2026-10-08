@@ -402,6 +402,11 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'expected_close_date': d.get('expected_close_date'),
                 'pessoa_nome': pessoa.get('name') if isinstance(pessoa, dict) else None,
                 'stage_id': d.get('stage_id'),
+                # Probabilidade (0-100) que o Pipedrive calcula/o closer ajusta no
+                # negócio — usada pelo sync da planilha de Previsão pra definir a
+                # Confiança automaticamente (>80% Quente, 50-80% Morno, <=50% Frio;
+                # pedido do time, 08/10/2026).
+                'probability': d.get('probability'),
             })
 
 df_deals = pd.DataFrame(deals_rows)

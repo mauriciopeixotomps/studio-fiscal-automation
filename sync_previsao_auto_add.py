@@ -237,6 +237,7 @@ if linhas_com_deal and not df.empty and col_confianca is not None:
     data_esperada_por_deal = dict(zip(df['deal_id'], df['expected_close_date'])) if 'expected_close_date' in df.columns else {}
     valor_por_deal = dict(zip(df['deal_id'], df['valor'])) if 'valor' in df.columns else {}
     caixa_por_deal = dict(zip(df['deal_id'], df['caixa'])) if 'caixa' in df.columns else {}
+    probabilidade_por_deal = dict(zip(df['deal_id'], df['probability'])) if 'probability' in df.columns else {}
     updates = []  # (a1, valor) pra um único batch_update no final
     logs = []
     for linha, deal_id, satus_cell, confianca_cell, data_esperada_cell, venda_cell, caixa_cell in linhas_com_deal:
@@ -248,13 +249,28 @@ if linhas_com_deal and not df.empty and col_confianca is not None:
             nova_confianca = 'FECHADO'
         elif status_atual == 'lost':
             nova_confianca = 'PERDIDO'
+        elif status_atual == 'open':
+            # Confiança do negócio em aberto vem da Probabilidade do Pipedrive
+            # (campo que o closer já ajusta no negócio) — fato, não mais uma
+            # estimativa manual do time. Pedido do time (08/10/2026): >80%
+            # Quente, 50-80% Morno, <=50% Frio. Sem probabilidade definida no
+            # Pipedrive, não mexe na Confiança que já está na planilha.
+            prob = probabilidade_por_deal.get(deal_id)
+            if prob is None or pd.isna(prob):
+                nova_confianca = None
+            elif prob > 80:
+                nova_confianca = 'QUENTE'
+            elif prob > 50:
+                nova_confianca = 'MORNO'
+            else:
+                nova_confianca = 'FRIO'
         else:
             nova_confianca = None
         if nova_confianca and (confianca_cell or '').strip().upper() != nova_confianca:
             if col_confianca is not None:
                 updates.append((gspread.utils.rowcol_to_a1(linha, col_confianca + 1), nova_confianca))
                 partes_log.append(f'Confiança={nova_confianca}')
-            if is_novo_auto and col_satus is not None:
+            if is_novo_auto and col_satus is not None and nova_confianca in ('FECHADO', 'PERDIDO'):
                 novo_satus = 'Ganho (auto)' if nova_confianca == 'FECHADO' else 'Perdido (auto)'
                 updates.append((gspread.utils.rowcol_to_a1(linha, col_satus + 1), novo_satus))
                 partes_log.append(f'Satus="{novo_satus}"')
@@ -311,6 +327,13 @@ candidatos = df[
     & df['expected_close_date'].notna()
     & ~df['deal_id'].isin(deal_ids_existentes)
 ].copy()
+
+# Negócio com fechamento esperado num mês FUTURO (depois do mês corrente) não
+# entra na planilha — pedido do time (08/10/2026): a planilha é só pro mês
+# atual (+ negócios em aberto atrasados de meses passados). Se continuar
+# aberto quando o mês dele chegar, entra normalmente nessa hora.
+_data_esperada_dt = pd.to_datetime(candidatos['expected_close_date'], errors='coerce')
+candidatos = candidatos[_data_esperada_dt.dt.date.apply(lambda x: pd.isna(x) or x <= config.MONTH_END)]
 
 # A Rebarba começa numa etapa literalmente chamada "PERDIDO" (reativação de
 # negócio perdido) — valor/data esperada ali podem ser resquício do negócio

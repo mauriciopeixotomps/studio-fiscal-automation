@@ -135,6 +135,20 @@ def _fmt_data_br(data_iso):
         return ''
 
 
+def _parse_valor_cel(txt):
+    """Lê de volta um valor que a própria planilha mostra formatado (ex: "R$
+    38.250,00") pra comparar com o número cru do Pipedrive. None se a célula
+    estiver vazia ou não for um número reconhecível."""
+    if not txt or not str(txt).strip():
+        return None
+    s = str(txt).strip().replace('R$', '').strip()
+    s = s.replace('.', '').replace(',', '.')
+    try:
+        return float(s)
+    except ValueError:
+        return None
+
+
 def _fetch_deal_products(deal_id):
     url = f'{BASE}/deals/{deal_id}/products?api_token={TOKEN}'
     for attempt in range(4):
@@ -165,11 +179,13 @@ col_confianca = next((i for i, c in enumerate(header) if c.lower().startswith('c
 
 col_lead = next((i for i, c in enumerate(header) if c.lower().startswith('lead')), 2)
 col_data_esperada = next((i for i, c in enumerate(header) if 'fechamento' in c.lower() and 'esperad' in c.lower()), None)
+col_venda = next((i for i, c in enumerate(header) if c.lower().strip() == 'venda'), None)
+col_caixa = next((i for i, c in enumerate(header) if c.lower().strip() == 'caixa'), None)
 
 deal_ids_existentes = set()
 nomes_existentes = set()  # nomes de lead (normalizados) que já estão na planilha — não adiciona de novo, mesmo que seja outro negócio
 linhas_auto = []  # (linha 1-based, deal_id) das linhas que ESTE script já criou (Satus começa com "Novo (auto)")
-linhas_com_deal = []  # (linha 1-based, deal_id, satus_cell, confianca_cell, data_esperada_cell) de TODA linha com link válido, mesmo editada à mão pelo time
+linhas_com_deal = []  # (linha 1-based, deal_id, satus_cell, confianca_cell, data_esperada_cell, venda_cell, caixa_cell) de TODA linha com link válido, mesmo editada à mão pelo time
 ultima_linha_com_dado = header_row_idx  # índice 0-based da última linha com Closer+Lead preenchidos
 for i in range(header_row_idx + 1, len(existing)):
     row = existing[i]
@@ -186,10 +202,12 @@ for i in range(header_row_idx + 1, len(existing)):
     satus_cell = row[col_satus] if col_satus is not None and col_satus < len(row) else ''
     confianca_cell = row[col_confianca] if col_confianca is not None and col_confianca < len(row) else ''
     data_esperada_cell = row[col_data_esperada] if col_data_esperada is not None and col_data_esperada < len(row) else ''
+    venda_cell = row[col_venda] if col_venda is not None and col_venda < len(row) else ''
+    caixa_cell = row[col_caixa] if col_caixa is not None and col_caixa < len(row) else ''
     if m and (satus_cell or '').strip().startswith('Novo (auto)'):
         linhas_auto.append((i + 1, int(m.group(1))))  # +1: gspread é 1-based
     if m:
-        linhas_com_deal.append((i + 1, int(m.group(1)), satus_cell, confianca_cell, data_esperada_cell))
+        linhas_com_deal.append((i + 1, int(m.group(1)), satus_cell, confianca_cell, data_esperada_cell, venda_cell, caixa_cell))
 
 print(f'   {len(deal_ids_existentes)} negócio(s) / {len(nomes_existentes)} nome(s) já na planilha ({len(linhas_auto)} ainda "Novo (auto)")')
 
@@ -217,9 +235,11 @@ df = pd.read_excel(deals_path)
 if linhas_com_deal and not df.empty and col_confianca is not None:
     status_por_deal = dict(zip(df['deal_id'], df['status']))
     data_esperada_por_deal = dict(zip(df['deal_id'], df['expected_close_date'])) if 'expected_close_date' in df.columns else {}
+    valor_por_deal = dict(zip(df['deal_id'], df['valor'])) if 'valor' in df.columns else {}
+    caixa_por_deal = dict(zip(df['deal_id'], df['caixa'])) if 'caixa' in df.columns else {}
     updates = []  # (a1, valor) pra um único batch_update no final
     logs = []
-    for linha, deal_id, satus_cell, confianca_cell, data_esperada_cell in linhas_com_deal:
+    for linha, deal_id, satus_cell, confianca_cell, data_esperada_cell, venda_cell, caixa_cell in linhas_com_deal:
         status_atual = status_por_deal.get(deal_id)
         is_novo_auto = (satus_cell or '').strip().startswith('Novo (auto)')
         partes_log = []
@@ -250,6 +270,27 @@ if linhas_com_deal and not df.empty and col_confianca is not None:
                 if not igual:
                     updates.append((gspread.utils.rowcol_to_a1(linha, col_data_esperada + 1), data_nova_fmt))
                     partes_log.append(f'Data fechamento esperada={data_nova_fmt}')
+
+        # Venda/Caixa também são fato do Pipedrive (o valor do negócio), não
+        # opinião do time — mantém sincronizado em qualquer linha, editada ou
+        # não, igual à data esperada. Pedido do time (08/10/2026, casos reais:
+        # Mirian e Bruna Bressani com o valor corrigido no Pipedrive depois
+        # que a linha já tinha entrado na planilha, e a planilha nunca mais
+        # acompanhou).
+        for col_idx, deal_dict, cel_atual, rotulo in (
+            (col_venda, valor_por_deal, venda_cell, 'Venda'),
+            (col_caixa, caixa_por_deal, caixa_cell, 'Caixa'),
+        ):
+            if col_idx is None:
+                continue
+            valor_novo = deal_dict.get(deal_id)
+            if valor_novo is None or pd.isna(valor_novo):
+                continue
+            valor_atual = _parse_valor_cel(cel_atual)
+            if valor_atual is not None and abs(float(valor_novo) - valor_atual) < 0.5:
+                continue
+            updates.append((gspread.utils.rowcol_to_a1(linha, col_idx + 1), float(valor_novo)))
+            partes_log.append(f'{rotulo}=R$ {float(valor_novo):,.2f}')
 
         if partes_log:
             logs.append(f'   ~ linha {linha} (deal {deal_id}): ' + ', '.join(partes_log))

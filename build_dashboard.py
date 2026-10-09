@@ -260,7 +260,12 @@ for a in config.AGENDADORES:
         'no_show': _contar_por_dia(no_show_ids, _no_show_dia_by_deal),
     }
     meta_agendamentos = leads_n * config.META_AGENDAMENTO_PCT
-    meta_realizadas = n_agendamentos * config.META_AGENDADOR_REALIZADA_PCT
+    # Meta de realizadas usa o agendamento ESPERADO (meta_agendamentos), não o
+    # que o SDR já agendou de fato — senão quem agenda pouco "ganha" uma meta
+    # de realizadas artificialmente baixa, mascarando o atraso. Pedido do
+    # time (09/10/2026): "a meta de realizadas e o que falta deve andar junto
+    # com o que ele deveria agendar, não com o que já tem agendado".
+    meta_realizadas = meta_agendamentos * config.META_AGENDADOR_REALIZADA_PCT
     agendadores_out.append({
         'nome': a['nome'],
         'leads_recebidos': int(leads_n),
@@ -271,8 +276,8 @@ for a in config.AGENDADORES:
         'pct_realizada': pct(realizadas_n, n_agendamentos),
         'pct_no_show': pct(no_show_n, n_agendamentos),
         # Quanto falta pra bater a própria meta: agendamentos até chegar em 30% dos
-        # leads recebidos, e realizadas até chegar em 65% dos agendamentos já feitos
-        # (não recalcula com agendamentos hipotéticos futuros).
+        # leads recebidos, e realizadas até chegar em 65% do que DEVERIA ter sido
+        # agendado (meta_agendamentos) — não do que já foi agendado de fato.
         'faltam_agendamentos': max(0, ceil(meta_agendamentos - n_agendamentos)),
         'faltam_realizadas': max(0, ceil(meta_realizadas - realizadas_n)),
         'diario': diario_agendador,

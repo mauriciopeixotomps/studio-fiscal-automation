@@ -1664,15 +1664,15 @@ function previsaoTotalRowHtml(label, rows, comTemperatura) {
     </tr>`;
 }
 // Resumo no topo do rodapé: separa bem claro "quanto ainda tá em negociação"
-// (previsto, nada fechado ainda) de "quanto já fechou de verdade", e soma os
-// dois num "total possível do mês" — pedido do time (16/10/2026): "não fica
-// claro a quantidade de negócios em negociação, tirando só fechados".
-function previsaoResumoRowsHtml(rows) {
+// (previsto, nada fechado ainda) de "quanto já fechou de verdade" — pedido do
+// time (16/10/2026): "não fica claro a quantidade de negócios em negociação,
+// tirando só fechados". O total combinando os dois (Total possível) fica no
+// FIM do rodapé, não aqui — pedido do time (16/10/2026): "as informações
+// finais no final".
+function previsaoEmNegociacaoFechadoRowsHtml(rows) {
   const t = previsaoSomar(rows);
   const emNegociacao = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r) && !previsaoProximoMes(r));
   const fechados = rows.filter(r => r.deal_status === 'won');
-  const totalVenda = t.venda + t.venda_realizada;
-  const totalCaixa = t.caixa + t.caixa_realizado;
   return `
     <tr class="relatorio-total relatorio-resumo">
       <td colspan="8">Em negociação — ainda não fechou (${emNegociacao.length} negócio${emNegociacao.length === 1 ? '' : 's'})</td>
@@ -1686,9 +1686,21 @@ function previsaoResumoRowsHtml(rows) {
       <td>${fmtMoney(t.venda_realizada)}</td>
       <td>${fmtMoney(t.caixa_realizado)}</td>
       <td></td>
-    </tr>
+    </tr>`;
+}
+// Total possível do mês = fechado + em negociação, com a quebra de quantos são
+// Franquia x Partner (pedido do time, 16/10/2026) — linha de FECHAMENTO do
+// rodapé, depois de todo o detalhamento por funil/ponderado.
+function previsaoTotalPossivelRowHtml(rows) {
+  const t = previsaoSomar(rows);
+  const relevantes = rows.filter(r => r.deal_status === 'won' || (!previsaoPerdido(r) && !previsaoProximoMes(r)));
+  const franquiaN = relevantes.filter(r => r.tipo_contrato !== 'partner').length;
+  const partnerN = relevantes.filter(r => r.tipo_contrato === 'partner').length;
+  const totalVenda = t.venda + t.venda_realizada;
+  const totalCaixa = t.caixa + t.caixa_realizado;
+  return `
     <tr class="relatorio-total relatorio-resumo relatorio-resumo-destaque">
-      <td colspan="8">Total possível do mês (fechado + em negociação)</td>
+      <td colspan="8">Total possível do mês (fechado + em negociação) — ${franquiaN} Franquia · ${partnerN} Partner</td>
       <td>${fmtMoney(totalVenda)}</td>
       <td>${fmtMoney(totalCaixa)}</td>
       <td></td><td></td><td></td><td></td><td></td>
@@ -1719,15 +1731,16 @@ const linhasPorFunil = funisPresentes.length > 1 ? funisPresentes.map(f => {
   return previsaoTotalRowHtml(`Total ${nome}`, D.previsao.filter(r => r.funil === f));
 }).join('') : '';
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
-  previsaoResumoRowsHtml(D.previsao) +
-  previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
+  previsaoEmNegociacaoFechadoRowsHtml(D.previsao) +
   linhasPorFunil +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +
+  previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
   previsaoTotalRowHtml('Total geral', D.previsao, true) +
   previsaoPostergadoRowHtml(D.previsao) +
   previsaoPonderadoRowHtml('Total ponderado pela probabilidade', D.previsao) +
   (funisPresentes.length > 1 ? funisPresentes.map(f => previsaoPonderadoRowHtml(
-    `Ponderado ${f.charAt(0) + f.slice(1).toLowerCase()}`, D.previsao.filter(r => r.funil === f))).join('') : '')
+    `Ponderado ${f.charAt(0) + f.slice(1).toLowerCase()}`, D.previsao.filter(r => r.funil === f))).join('') : '') +
+  previsaoTotalPossivelRowHtml(D.previsao)
 ) : '';
 
 // ===== Time de agendamento (SDRs dedicados) =====

@@ -204,6 +204,8 @@
   .relatorio-table-wrap table th, .relatorio-table-wrap table td { font-size: 12px; padding: 6px 10px; white-space: nowrap; }
   .relatorio-table-wrap table th:first-child, .relatorio-table-wrap table td:first-child { position: sticky; left: 0; background: var(--card-hi); }
   .relatorio-total td { font-weight: 700; color: var(--text); border-top: 2px solid var(--border); background: var(--card); }
+  .relatorio-resumo td { font-size: 13px; }
+  .relatorio-resumo-destaque td { background: var(--card-hi); border-top: 2px solid var(--accent); color: var(--accent); font-size: 14px; }
   .relatorio-team { margin-top: 20px; padding-top: 20px; border-top: 2px solid var(--accent); }
   .relatorio-team .name { color: var(--accent); }
 
@@ -327,7 +329,7 @@
   </header>
 
   <div class="card" id="card-placar">
-    <h2>Placar do mês <span class="hint">— Realizado vem direto do Pipedrive (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão</span><span class="dia-badge" id="dia-badge-placar"></span></h2>
+    <h2>Placar do mês <span class="hint" id="placar-hint">— Realizado vem direto do Pipedrive (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão</span><span class="dia-badge" id="dia-badge-placar"></span></h2>
     <div class="scoreboard">
       <div class="score-item green">
         <div class="lbl">Contratos fechados</div>
@@ -350,8 +352,20 @@
     </div>
   </div>
 
+  <div class="card" id="card-ganhos" style="display:none">
+    <h2>Negócios fechados <span class="hint">— cada Ganho que entra no Placar acima, com dono, funil e tipo de contrato</span></h2>
+    <div style="overflow-x:auto">
+      <table id="ganhos-table">
+        <thead>
+          <tr><th>Data</th><th>Negócio</th><th>Closer</th><th>Funil</th><th>Tipo</th><th>Venda</th><th>Caixa</th><th>Deal</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
   <div class="card" id="card-metas">
-    <h2>Metas do mês <span class="hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (mesmo número do "Contratos fechados" do Placar do mês)</span><span class="dia-badge" id="dia-badge-metas"></span></h2>
+    <h2>Metas do mês <span class="hint" id="metas-hint">— contratos aqui conta só negócios Ganhos cujo dono no Pipedrive é um dos closers atuais (mesmo número do "Contratos fechados" do Placar do mês)</span><span class="dia-badge" id="dia-badge-metas"></span></h2>
     <div class="meta-grid">
       <div class="meta-block">
         <h3>Negócios iniciados Studio Fiscal</h3>
@@ -677,6 +691,26 @@ function renderScoreboard(sb, diaMode) {
     diaMode ? '' : tipoContratoTxt(sb.caixa_realizado_franquia, sb.caixa_realizado_partner, fmtMoney);
 }
 renderScoreboard(D.scoreboard, false);
+
+// ===== Escopo do Placar/Metas e lista de negócios fechados (16/10/2026) =====
+if (D.placar_hint) document.getElementById('placar-hint').textContent = D.placar_hint;
+if (D.metas_hint) document.getElementById('metas-hint').textContent = D.metas_hint;
+if (Array.isArray(D.ganhos)) {
+  const tipoTxt = t => t === 'franquia' ? 'Franquia' : (t === 'partner' ? 'Partner' : 'Sem produto');
+  const funilTxt = f => f ? f.charAt(0) + f.slice(1).toLowerCase() : '—';
+  document.querySelector('#ganhos-table tbody').innerHTML = D.ganhos.length ? D.ganhos.map(g => `
+    <tr>
+      <td>${fmtDate((g.won_time || '').slice(0, 10))}</td>
+      <td>${g.pessoa_nome || g.titulo || '—'}</td>
+      <td>${g.closer_nome || '—'}</td>
+      <td>${funilTxt(g.funil)}</td>
+      <td>${tipoTxt(g.tipo_contrato)}</td>
+      <td>${fmtMoney(g.valor)}</td>
+      <td>${fmtMoney(g.caixa)}</td>
+      <td>${g.deal_link ? `<a href="${g.deal_link}" target="_blank" rel="noopener" style="color:var(--accent)">ver</a>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="8" style="color:var(--text-dim)">Nenhum negócio fechado no período.</td></tr>';
+  document.getElementById('card-ganhos').style.display = '';
+}
 
 // ===== Datas do mês (usado pelo pace e pelos gráficos) =====
 const MONTH_DATES = (function() {
@@ -1629,6 +1663,37 @@ function previsaoTotalRowHtml(label, rows, comTemperatura) {
       <td></td>
     </tr>`;
 }
+// Resumo no topo do rodapé: separa bem claro "quanto ainda tá em negociação"
+// (previsto, nada fechado ainda) de "quanto já fechou de verdade", e soma os
+// dois num "total possível do mês" — pedido do time (16/10/2026): "não fica
+// claro a quantidade de negócios em negociação, tirando só fechados".
+function previsaoResumoRowsHtml(rows) {
+  const t = previsaoSomar(rows);
+  const emNegociacao = rows.filter(r => r.deal_status !== 'won' && !previsaoPerdido(r) && !previsaoProximoMes(r));
+  const fechados = rows.filter(r => r.deal_status === 'won');
+  const totalVenda = t.venda + t.venda_realizada;
+  const totalCaixa = t.caixa + t.caixa_realizado;
+  return `
+    <tr class="relatorio-total relatorio-resumo">
+      <td colspan="8">Em negociação — ainda não fechou (${emNegociacao.length} negócio${emNegociacao.length === 1 ? '' : 's'})</td>
+      <td>${fmtMoney(t.venda)}</td>
+      <td>${fmtMoney(t.caixa)}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>
+    <tr class="relatorio-total relatorio-resumo">
+      <td colspan="8">Já fechado (${fechados.length} negócio${fechados.length === 1 ? '' : 's'})</td>
+      <td></td><td></td><td></td><td></td>
+      <td>${fmtMoney(t.venda_realizada)}</td>
+      <td>${fmtMoney(t.caixa_realizado)}</td>
+      <td></td>
+    </tr>
+    <tr class="relatorio-total relatorio-resumo relatorio-resumo-destaque">
+      <td colspan="8">Total possível do mês (fechado + em negociação)</td>
+      <td>${fmtMoney(totalVenda)}</td>
+      <td>${fmtMoney(totalCaixa)}</td>
+      <td></td><td></td><td></td><td></td><td></td>
+    </tr>`;
+}
 const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(confiancaEfetiva(r)) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won' && !previsaoProximoMes(r));
 const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
 function previsaoPostergadoRowHtml(rows) {
@@ -1654,6 +1719,7 @@ const linhasPorFunil = funisPresentes.length > 1 ? funisPresentes.map(f => {
   return previsaoTotalRowHtml(`Total ${nome}`, D.previsao.filter(r => r.funil === f));
 }).join('') : '';
 document.querySelector('#previsao-table tfoot').innerHTML = D.previsao.length ? (
+  previsaoResumoRowsHtml(D.previsao) +
   previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
   linhasPorFunil +
   previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +

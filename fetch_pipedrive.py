@@ -438,6 +438,10 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'agendador_nome': AGENDADOR_NOME.get(agendador_id),
                 'pipeline_id': d.get('pipeline_id'),
                 'add_time': _fix_dt(d.get('add_time')),
+                # Usado só pra descartar lead REATRIBUÍDO de outro SDR (o dono
+                # mudou muito tempo depois de criado) da contagem de "leads
+                # recebidos" do dono atual — ver build_dashboard.py.
+                'update_time': _fix_dt(d.get('update_time')),
             })
 pd.DataFrame(agendadores_deals_rows).to_excel(os.path.join(OUT_DIR, 'deals_agendadores.xlsx'), index=False)
 n_leads = df_deals['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_deals) else 0

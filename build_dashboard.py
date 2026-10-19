@@ -47,6 +47,26 @@ agendadores_agendamentos = load('agendadores_agendamentos.xlsx')
 qualificacao_re = load('activities_qualificacao_realizada.xlsx')
 no_show_re = load('activities_no_show.xlsx')
 
+
+def _dedup_mesmo_dia(df):
+    """Atividade duplicada no Pipedrive (mesmo negócio, mesmo tipo, marcada no
+    mesmo dia — ex: FPQ lançada duas vezes) contava duas vezes no painel. Fica
+    uma por negócio por dia (16/10/2026: divergência de CC1/FPQ entre o painel,
+    o Pipedrive e a conta do closer)."""
+    if df.empty or 'negocio_id' not in df.columns or 'marked_as_done_time' not in df.columns:
+        return df
+    dia = pd.to_datetime(df['marked_as_done_time'], errors='coerce').dt.date
+    sem_negocio = df['negocio_id'].isna()
+    chave = df.assign(_dia=dia)
+    return pd.concat([chave[sem_negocio], chave[~sem_negocio].drop_duplicates(subset=['negocio_id', '_dia'])]).drop(columns=['_dia']).sort_index()
+
+
+cc1_re = _dedup_mesmo_dia(cc1_re)
+cc2_re = _dedup_mesmo_dia(cc2_re)
+cc3_re = _dedup_mesmo_dia(cc3_re)
+fpq_re = _dedup_mesmo_dia(fpq_re)
+no_show_re = _dedup_mesmo_dia(no_show_re)
+
 if not deals.empty:
     deals = deals[~deals['deal_id'].isin(config.DEALS_EXCLUIDOS)]
     if not deals_produtos.empty:
@@ -234,8 +254,21 @@ for a in config.AGENDADORES:
     leads_dia = {}
     if not deals_agendadores.empty and 'agendador_id' in deals_agendadores.columns and 'add_time' in deals_agendadores.columns:
         _dd = deals_agendadores[deals_agendadores['agendador_id'] == a['id']].copy()
-        _dd['add_time'] = pd.to_datetime(_dd['add_time'], errors='coerce').dt.date
-        _dd_mes = _dd[_dd['add_time'].apply(lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END)]
+        add_time_dt = pd.to_datetime(_dd['add_time'], errors='coerce')
+        # Lead REATRIBUÍDO de outro SDR (o dono mudou muito tempo depois de
+        # criado) não conta como "recebido" por quem é dono agora — senão
+        # infla o denominador de quem recebeu o lote e derruba a conversão
+        # dele à toa. Caso real (19/10/2026): 337 negócios transferidos de
+        # Leonardo Soares pra Jonatans Junior de uma vez (bulk update
+        # confirmado no histórico do Pipedrive), 5 deles criados em outubro.
+        if 'update_time' in _dd.columns:
+            update_time_dt = pd.to_datetime(_dd['update_time'], errors='coerce')
+            gap_dias = (update_time_dt - add_time_dt).dt.days
+            nao_reatribuido = gap_dias.isna() | (gap_dias.abs() <= 7)
+        else:
+            nao_reatribuido = True
+        _dd['add_time'] = add_time_dt.dt.date
+        _dd_mes = _dd[(add_time_dt.dt.date.apply(lambda x: pd.notna(x) and config.MONTH_START <= x <= config.MONTH_END)) & nao_reatribuido]
         leads_n = int(len(_dd_mes))
         for d in _dd_mes['add_time']:
             leads_dia[d.isoformat()] = leads_dia.get(d.isoformat(), 0) + 1
@@ -810,7 +843,41 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         'caixa_realizado_partner': float(dw_partner['caixa'].fillna(0).sum()) if not dw_partner.empty else 0.0,
     }
 
+    # Negócios fechados no mês, um por um (16/10/2026: "quero ver quem são,
+    # quem foram") — mesmo escopo do Placar (dw), com dono, funil, tipo e link.
+    ganhos = []
+    if not dw.empty:
+        for _, r in dw.sort_values('won_time').iterrows():
+            def _v(x):
+                return None if pd.isna(x) else x
+            ganhos.append({
+                'deal_id': int(r['deal_id']) if pd.notna(r.get('deal_id')) else None,
+                'titulo': _v(r.get('titulo')),
+                'pessoa_nome': _v(r.get('pessoa_nome')),
+                'closer_nome': _v(r.get('closer_nome')),
+                'won_time': r['won_time'].strftime('%Y-%m-%d %H:%M') if pd.notna(r.get('won_time')) else None,
+                'tipo_contrato': _v(r.get('tipo_contrato')),
+                'valor': float(r['valor']) if pd.notna(r.get('valor')) else 0.0,
+                'caixa': float(r['caixa']) if pd.notna(r.get('caixa')) else 0.0,
+                'funil': config.FUNIL_POR_PIPELINE.get(int(r['pipeline_id'])) if pd.notna(r.get('pipeline_id')) else None,
+                'deal_link': f"https://{config.PIPEDRIVE_DOMAIN}/deal/{int(r['deal_id'])}" if pd.notna(r.get('deal_id')) else None,
+            })
+    _escopo_multi = set(_scoreboard_pipeline_ids) != set(pipeline_ids)
+    placar_hint = (
+        '— Realizado direto do Pipedrive somando todos os funis da Fiscal (Inbound, Rebarba e Outbound); Previsto vem da planilha de previsão'
+        if _escopo_multi else
+        '— Realizado direto do Pipedrive, só deste funil (mesmo escopo do Metas do mês); Previsto vem da planilha de previsão'
+    )
+    metas_hint = (
+        '— contratos aqui contam só os Ganhos deste funil com dono entre os closers atuais; o Placar acima soma também Rebarba e Outbound'
+        if _escopo_multi else
+        '— contratos aqui contam só os Ganhos deste funil com dono entre os closers atuais (mesmo número do Placar do mês)'
+    )
+
     return {
+        'ganhos': ganhos,
+        'placar_hint': placar_hint,
+        'metas_hint': metas_hint,
         'meta_contratos': meta_contratos_val,
         'meta_leads': meta_leads,
         'tem_meta': tem_meta,

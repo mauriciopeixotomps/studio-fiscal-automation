@@ -216,6 +216,14 @@ LABEL_STUDIO_FISCAL = '97'
 #   05/08/2026).
 DEALS_EXCLUIDOS = {57206, 84764, 92183, 95176}
 
+# deal_id Ganho no Pipedrive com o Mauricio (admin) como "owner", não um dos 4
+# closers — fica fora do deals.xlsx (fetch por closer) e por isso não contava no
+# Placar/Ganhos. Buscado à parte e somado ao deals.xlsx, sem closer_nome (não é
+# fechamento de nenhum closer específico, mas entra no Ganho do time).
+# - 136403 (Pedro Rovaris): licenciamento Studio Law de 2023, virado Partner pelo
+#   Mauricio direto — confirmado que deve contar como Ganho do time (20/10/2026).
+DEALS_GANHO_MANUAL = {136403}
+
 # deal_id da planilha de Previsão pra desconsiderar do Placar do mês (e da própria
 # tabela de Previsão) — não mexe na planilha em si, só filtra na leitura.
 # - 90987 (Sandro/Émerson): venda da Studio Fiscal, mas Émerson já é da Studio Agro

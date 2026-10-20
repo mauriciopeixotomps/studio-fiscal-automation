@@ -409,6 +409,35 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'probability': d.get('probability'),
             })
 
+# Negócios Ganhos manualmente por quem não é um dos 4 closers (ver comentário de
+# config.DEALS_GANHO_MANUAL) — buscados à parte, sem closer_id/closer_nome, só pra
+# entrar no total de Ganhos do time.
+for _deal_id in config.DEALS_GANHO_MANUAL:
+    try:
+        with urllib.request.urlopen(f'{BASE}/deals/{_deal_id}?api_token={TOKEN}', timeout=30) as r:
+            d = (json.loads(r.read()).get('data')) or {}
+    except Exception:
+        d = {}
+    if d.get('id'):
+        pessoa = d.get('person_id')
+        deals_rows.append({
+            'deal_id': d.get('id'),
+            'titulo': d.get('title'),
+            'closer_id': None,
+            'closer_nome': None,
+            'pipeline_id': d.get('pipeline_id'),
+            'status': d.get('status'),
+            'valor': d.get('value'),
+            'caixa': d.get(config.CF_CAIXA),
+            'add_time': _fix_dt(d.get('add_time')),
+            'won_time': _fix_dt(d.get('won_time')),
+            'expected_close_date': d.get('expected_close_date'),
+            'pessoa_nome': pessoa.get('name') if isinstance(pessoa, dict) else None,
+            'stage_id': d.get('stage_id'),
+            'probability': d.get('probability'),
+        })
+        print(f'   + deal Ganho manual incluído: {d.get("id")} ({d.get("title")})')
+
 df_deals = pd.DataFrame(deals_rows)
 df_deals.to_excel(os.path.join(OUT_DIR, 'deals.xlsx'), index=False)
 

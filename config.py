@@ -248,6 +248,16 @@ BENCHMARK_LEADS_PARA_CC1 = META_AGENDAMENTO_PCT * META_AGENDADOR_REALIZADA_PCT
 BENCHMARK_CC1_PARA_FPQ = 8 / 15
 BENCHMARK_FPQ_PARA_CC2 = 4 / 8
 BENCHMARK_CC2_PARA_CC3 = 2 / 4
+# CC3 -> Contrato enviado: antes era uma razão AO VIVO do mês corrente
+# (contrato_enviado atual / cc3_realizada do mês), que ficava instável no início
+# do mês (poucas CC3 ainda) e piorou quando Contrato enviado passou a somar os 4
+# funis da Fiscal (21/10/2026) contra uma CC3 que só existe no Inbound (pipeline
+# 62) — trocado por uma taxa fixa acumulada de jul+ago+set/2026, só pipeline 62
+# (Contrato enviado 7+6+8=21 / CC3 Realizada 17+14+5=36), pedido do time
+# (21/10/2026: "suponto que eu faça 60 CC1 esse mês e 60 mês passado, no máximo
+# 30 chegariam a proposta neste mês" — a defasagem entre meses se equilibra
+# acumulando vários meses em vez de olhar um mês isolado).
+BENCHMARK_CC3_PARA_CONTRATO_ENVIADO = 21 / 36
 
 # ============= META =============
 # Um arquivo de metas por mês (mesmo padrão do projeto Qualificadora) — criar um novo

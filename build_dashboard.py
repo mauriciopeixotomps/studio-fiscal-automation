@@ -619,18 +619,18 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     daily_cc2 = daily_series(cc2_p, 'marked_as_done_time')
     daily_cc3 = daily_series(cc3_p, 'marked_as_done_time')
 
-    # Metas de CC1/FPQ/CC2/CC3 estimadas em cascata a partir da meta de leads
-    # (config.BENCHMARK_*). Contrato enviado continua estimado pela conversão real
-    # do mês (CC3 -> Contrato enviado). Sem meta_leads (ex: Outbound ainda sem meta),
-    # tudo cascateia pra None.
+    # Metas de CC1/FPQ/CC2/CC3/Contrato enviado estimadas em cascata a partir da
+    # meta de leads (config.BENCHMARK_*) — taxas fixas acumuladas de meses
+    # anteriores, não uma razão ao vivo do mês corrente (essa ficava instável no
+    # início do mês e pior ainda depois que Contrato enviado passou a somar os 4
+    # funis da Fiscal contra uma CC3 só do Inbound, 21/10/2026). Sem meta_leads
+    # (ex: Outbound ainda sem meta), tudo cascateia pra None.
     meta_cc1_calc = round(meta_leads * config.BENCHMARK_LEADS_PARA_CC1) if meta_leads else None
     meta_fpq_calc = round(meta_cc1_calc * config.BENCHMARK_CC1_PARA_FPQ) if meta_cc1_calc else None
     meta_cc2_calc = round(meta_fpq_calc * config.BENCHMARK_FPQ_PARA_CC2) if meta_fpq_calc else None
     meta_cc3_calc = round(meta_cc2_calc * config.BENCHMARK_CC2_PARA_CC3) if meta_cc2_calc else None
-    cc3_para_contrato_enviado = pct(consolidado['contrato_enviado'], consolidado['cc3_realizada'])
     meta_contrato_enviado_calc = (
-        round(meta_cc3_calc * cc3_para_contrato_enviado / 100)
-        if meta_cc3_calc and cc3_para_contrato_enviado else None
+        round(meta_cc3_calc * config.BENCHMARK_CC3_PARA_CONTRATO_ENVIADO) if meta_cc3_calc else None
     )
 
     pace = {

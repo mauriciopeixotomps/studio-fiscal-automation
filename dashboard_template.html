@@ -1565,7 +1565,13 @@ function probCell(r) {
   return p === null ? '—' : `${p}%`;
 }
 const tbody = document.querySelector('#previsao-table tbody');
-tbody.innerHTML = D.previsao.map(r => `
+// Postergado pro próximo mês não aparece como linha da tabela deste mês — só
+// no resumo "Postergado pro próximo mês" do rodapé (pedido do time,
+// 21/10/2026: "os postergados não devem aparecer na tabela do mês"). Mesma
+// condição do rodapé: só esconde quem ainda está em aberto e empurrado — um
+// negócio já Ganho/Perdido continua aparecendo mesmo com uma data antiga
+// esquecida no campo (não é "postergado" de verdade, já resolveu).
+tbody.innerHTML = D.previsao.filter(r => !(r.deal_status !== 'won' && !previsaoPerdido(r) && previsaoProximoMes(r))).map(r => `
   <tr>
     <td>${fmtDate(r.data_registro)}</td>
     <td>${r.closer || '—'}</td>

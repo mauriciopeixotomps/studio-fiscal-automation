@@ -598,11 +598,57 @@ while not stop:
         break
     start = pag.get('next_start', start + len(data))
 
+# Mesmo problema, pros Ganhos: sem isso, deals_pipelineXX.xlsx nunca tem negócio
+# Ganho nenhum (exceto os raros com stage_change_time nulo tratados à parte em
+# config.DEALS_GANHO_MANUAL), e qualquer métrica baseada em stage_id/
+# stage_change_time desses arquivos (ex: "Contrato enviado") fica sempre vazia
+# pra quem já fechou — confirmado 21/10/2026 ("todo contrato ganho
+# necessariamente teve contrato enviado", card zerado no painel).
+print('-> Fetching negócios Ganhos (todos os funis, parando na janela do mês)...')
+won_rows_all = []
+start = 0
+stop = False
+while not stop:
+    params = {'status': 'won', 'sort': 'won_time DESC', 'limit': 500, 'start': start, 'api_token': TOKEN}
+    qs = urllib.parse.urlencode(params)
+    body = None
+    for attempt in range(10):
+        try:
+            with urllib.request.urlopen(f'{BASE}/deals?{qs}', timeout=120) as r:
+                body = json.loads(r.read())
+            break
+        except urllib.error.HTTPError as e:
+            if e.code == 429:
+                wait = 15 * (attempt + 1)
+                print(f'     rate limit (429), esperando {wait}s...')
+                time.sleep(wait)
+            elif attempt == 9:
+                raise
+            else:
+                time.sleep(3)
+    if body is None:
+        break
+    data = body.get('data') or []
+    if not data:
+        break
+    for d in data:
+        wt = _fix_dt(d.get('won_time'))
+        if wt and _in_range(wt, config.MONTH_START, config.MONTH_END):
+            won_rows_all.append(d)
+        elif wt and pd.to_datetime(wt).date() < config.MONTH_START:
+            stop = True
+    pag = body.get('additional_data', {}).get('pagination', {})
+    if not pag.get('more_items_in_collection'):
+        break
+    start = pag.get('next_start', start + len(data))
+
 p62_lost = [d for d in lost_rows_all if d.get('pipeline_id') == config.PIPELINE_STUDIO_FISCAL_FRANQUIA]
+p62_won = [d for d in won_rows_all if d.get('pipeline_id') == config.PIPELINE_STUDIO_FISCAL_FRANQUIA]
 print(f'   perdidos no mês (todos funis): {len(lost_rows_all)} | no funil 62: {len(p62_lost)}')
+print(f'   ganhos no mês (todos funis): {len(won_rows_all)} | no funil 62: {len(p62_won)}')
 
 p62_rows = []
-for d in p62_raw + p62_lost:
+for d in p62_raw + p62_lost + p62_won:
     owner = d.get('user_id') or {}
     p62_rows.append({
         'deal_id': d.get('id'),
@@ -635,10 +681,11 @@ print(f'   negócios no funil (todos, {len(df_p62)}) | negócios iniciados no m�
 print('-> Fetching negócios do funil OUTBOUND - STUDIO FISCAL FRANQUIA (pipeline 66, todos)...')
 p66_raw = fetch_all(f'pipelines/{config.PIPELINE_OUTBOUND_STUDIO_FISCAL}/deals', {'status': 'all_not_deleted'})
 p66_lost = [d for d in lost_rows_all if d.get('pipeline_id') == config.PIPELINE_OUTBOUND_STUDIO_FISCAL]
-print(f'   perdidos no funil 66 (dentre os já buscados no mês): {len(p66_lost)}')
+p66_won = [d for d in won_rows_all if d.get('pipeline_id') == config.PIPELINE_OUTBOUND_STUDIO_FISCAL]
+print(f'   perdidos no funil 66 (dentre os já buscados no mês): {len(p66_lost)} | ganhos: {len(p66_won)}')
 
 p66_rows = []
-for d in p66_raw + p66_lost:
+for d in p66_raw + p66_lost + p66_won:
     owner = d.get('user_id') or {}
     p66_rows.append({
         'deal_id': d.get('id'),
@@ -671,9 +718,10 @@ def _fetch_pipeline_deals(pipeline_id, nome_log):
     print(f'-> Fetching negócios do funil {nome_log} (pipeline {pipeline_id}, todos)...')
     raw = fetch_all(f'pipelines/{pipeline_id}/deals', {'status': 'all_not_deleted'})
     lost = [d for d in lost_rows_all if d.get('pipeline_id') == pipeline_id]
-    print(f'   perdidos no funil {pipeline_id} (dentre os já buscados no mês): {len(lost)}')
+    won = [d for d in won_rows_all if d.get('pipeline_id') == pipeline_id]
+    print(f'   perdidos no funil {pipeline_id} (dentre os já buscados no mês): {len(lost)} | ganhos: {len(won)}')
     rows = []
-    for d in raw + lost:
+    for d in raw + lost + won:
         owner = d.get('user_id') or {}
         rows.append({
             'deal_id': d.get('id'),

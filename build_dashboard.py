@@ -322,7 +322,7 @@ agendadores_meta = {
 
 
 def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, meta_leads, meta_contratos_val, tem_meta, funil_nome,
-                scoreboard_pipeline_ids=None, previsao_todos_funis=False):
+                scoreboard_pipeline_ids=None, previsao_todos_funis=False, contrato_enviado_extra=None):
     """Monta o dict de dados de UMA página (inbound, outbound, rebarba...), filtrando
     CC1/CC2/CC3/FPQ pelo pipeline_id do negócio vinculado — pra não misturar atividade
     de um funil no número do outro. pipeline_ids é uma lista pra dar pra juntar mais de
@@ -365,18 +365,48 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
     if not deals_p.empty:
         deals_p['closer_nome'] = deals_p['owner_id'].map(_closer_nome_por_id)
 
-    # "Contrato enviado" contado pela etapa do negócio, não por atividade separada —
-    # só pega negócios que estão *atualmente* nessa etapa E ainda em aberto
-    # (stage_change_time = quando entrou). Sem o status=='open', um negócio que
-    # passou por essa etapa e depois foi Ganho ou Perdido continuava contando pra
-    # sempre (o stage_id gravado não muda depois que o negócio fecha) — corrigido
-    # 29/08/2026.
+    # "Contrato enviado" contado pela etapa do negócio, não por atividade separada.
+    # Duas versões, usos diferentes:
+    # - contrato_enviado_re (status=='open'): snapshot ATUAL de quem está parado
+    #   nessa etapa agora, aguardando assinatura — usado no "Relatório por closer"
+    #   (count_by_closer, sem filtro de data). Sem o status=='open' aqui, um
+    #   negócio que passou pela etapa e depois foi Ganho/Perdido continuava
+    #   contando pra sempre (o stage_id gravado não muda depois que fecha) —
+    #   corrigido 29/08/2026.
+    # - contrato_enviado_mes_re (qualquer status): usado no ritmo (daily_series/
+    #   per_closer_daily, já filtrados por stage_change_time dentro do mês) — todo
+    #   negócio Ganho necessariamente passou por "Contrato enviado" antes, então
+    #   excluir quem já não está mais 'open' subcontava o ritmo do mês (pedido do
+    #   time, 21/10/2026: "todo contrato ganho necessariamente teve contrato
+    #   enviado"). O filtro de mês já vem do stage_change_time dentro de
+    #   daily_series/per_closer_daily, não precisa do status aqui.
     contrato_enviado_re = pd.DataFrame()
+    contrato_enviado_mes_re = pd.DataFrame()
     if not deals_p.empty and 'stage_id' in deals_p.columns:
-        contrato_enviado_re = deals_p[
-            deals_p['stage_id'].isin(stages_contrato_enviado) & (deals_p['status'] == 'open')
-        ].copy()
-        contrato_enviado_re = contrato_enviado_re[contrato_enviado_re['closer_nome'].notna()]
+        _ce = deals_p[deals_p['stage_id'].isin(stages_contrato_enviado) & deals_p['closer_nome'].notna()].copy()
+        contrato_enviado_re = _ce[_ce['status'] == 'open']
+        contrato_enviado_mes_re = _ce
+
+    # Painel principal (Inbound) soma "Contrato enviado" de TODOS os funis da
+    # Fiscal, não só o próprio (pedido do time, 21/10/2026: "todos que passam
+    # pela etapa de contrato enviado tem que constar aqui, de qualquer funil") —
+    # mesmo espírito do Placar de Ganhos (scoreboard_pipeline_ids), mas aqui
+    # precisa de stage_id/stage_change_time por funil (não tem em deals.xlsx),
+    # por isso recebe os dataframes por pipeline já carregados em vez de reusar
+    # deals_pipe_scoreboard.
+    if contrato_enviado_extra:
+        extras_atual, extras_mes = [], []
+        for _df_extra, _stages_extra in contrato_enviado_extra:
+            if _df_extra.empty or 'stage_id' not in _df_extra.columns:
+                continue
+            _e = _df_extra[_df_extra['stage_id'].isin(_stages_extra)].copy()
+            _e['closer_nome'] = _e['owner_id'].map(_closer_nome_por_id)
+            _e = _e[_e['closer_nome'].notna()]
+            extras_mes.append(_e)
+            extras_atual.append(_e[_e['status'] == 'open'])
+        if extras_mes:
+            contrato_enviado_re = pd.concat([contrato_enviado_re] + extras_atual, ignore_index=True)
+            contrato_enviado_mes_re = pd.concat([contrato_enviado_mes_re] + extras_mes, ignore_index=True)
 
     def negocios_iniciados_por_deal(nome):
         """"Negócios iniciados" = união deduplicada de negócios que esse closer levou
@@ -478,7 +508,7 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
             'cc2_futura': per_closer_daily(cc2_fut_p, 'due_date', c['nome']),
             'cc3_realizada': per_closer_daily(cc3_p, 'marked_as_done_time', c['nome']),
             'cc3_futura': per_closer_daily(cc3_fut_p, 'due_date', c['nome']),
-            'contrato_enviado': per_closer_daily(contrato_enviado_re, 'stage_change_time', c['nome']),
+            'contrato_enviado': per_closer_daily(contrato_enviado_mes_re, 'stage_change_time', c['nome']),
             'contratos': per_closer_daily(deals_pipe, 'won_time', c['nome'], status='won'),
             'contratos_franquia': contratos_diario_por_tipo(c['nome'], 'franquia'),
             'contratos_partner': contratos_diario_por_tipo(c['nome'], 'partner'),
@@ -574,7 +604,7 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         daily_leads = daily_leads_funil
         consolidado['leads'] = consolidado['leads_funil']
 
-    daily_contrato_enviado = daily_series(contrato_enviado_re, 'stage_change_time')
+    daily_contrato_enviado = daily_series(contrato_enviado_mes_re, 'stage_change_time')
 
     daily_contratos = {}
     if not deals_pipe.empty:
@@ -921,6 +951,11 @@ inbound_data = build_page(
         config.PIPELINE_OUTBOUND_EVENTOS,
     ],
     previsao_todos_funis=True,
+    contrato_enviado_extra=[
+        (deals_p65, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA]),
+        (deals_p66, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND]),
+        (deals_p69, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS]),
+    ],
 )
 # "Consolidado do time" (Inbound) ganha 2 etapas antes da CC1 — Leads iniciados (já
 # calculado acima) e Leads qualificados (atividade Qualificação Realizada, feita pelo

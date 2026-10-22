@@ -1025,7 +1025,18 @@ paceCharts.push(new Chart(document.getElementById('pace-canvas-comparativo'), {
 // (ex.: FPQs recebidas) era simplesmente descartado em vez de virar uma nova
 // página. Corrigido: força o resize/redraw de todo gráfico de forma síncrona
 // assim que o navegador avisa que vai imprimir, ANTES da paginação rodar.
-window.addEventListener('beforeprint', () => { paceCharts.forEach(c => c.resize()); });
+// 5º ajuste (22/10/2026): mesmo com o resize síncrono acima, o PDF real
+// exportado ainda mostrava os gráficos vazando pra fora do card (largura
+// antiga, de antes do @media print entrar em vigor) — o resize() do Chart.js
+// mede o container (offsetWidth) no exato instante em que é chamado, e nesse
+// instante o navegador podia ainda não ter recalculado o layout pro
+// @media print (html/body com largura forçada pra 289mm, ver CSS acima).
+// Força esse recálculo primeiro (ler offsetWidth joga fora qualquer layout
+// pendente) antes de medir/redesenhar os gráficos.
+window.addEventListener('beforeprint', () => {
+  void document.body.offsetWidth;
+  paceCharts.forEach(c => c.resize());
+});
 
 // ===== Funil (consolidado e por closer) =====
 function convPct(val, base) {

@@ -82,7 +82,15 @@
   .pace-card .pace-title { font-weight: 700; font-size: 14px; }
   .pace-card .pace-nums { font-size: 12px; color: var(--text-dim); }
   .pace-card .pace-nums b { color: var(--text); }
-  .pace-card .pace-chart { height: 130px; }
+  .pace-card .pace-chart { height: 130px; overflow: hidden; }
+  .pace-card .pace-chart canvas {
+    /* max-width sempre vence sobre o width que o Chart.js seta inline via JS,
+       não importa o que o resize() tenha medido errado — trava física contra
+       o canvas vazar pro card vizinho (22/10/2026, resize síncrono sozinho
+       não bastou no PDF real exportado: largura ficava presa na medição de
+       antes do layout de impressão recalcular). */
+    max-width: 100% !important;
+  }
   .pace-card .pace-tag { font-size: 10px; color: var(--text-dim); background: var(--card); border-radius: 999px; padding: 1px 8px; margin-left: 6px; }
   .pace-legend { display: flex; gap: 14px; font-size: 11px; color: var(--text-dim); margin-bottom: 6px; flex-wrap: wrap; }
   .pace-legend span { display: inline-flex; align-items: center; gap: 5px; }

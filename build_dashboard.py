@@ -39,6 +39,7 @@ deals_p62 = load('deals_pipeline62.xlsx')
 deals_p66 = load('deals_pipeline66.xlsx')
 deals_p65 = load('deals_pipeline65.xlsx')  # REBARBA STUDIO FISCAL FRANQUIA
 deals_p69 = load('deals_pipeline69.xlsx')  # OUTBOUND - EVENTOS (reportado junto com o 66)
+deals_p72 = load('deals_pipeline72.xlsx')  # FENALAW 2026 (compartilhado com a Agro)
 deals_produtos = load('deals_produtos.xlsx')  # tipo_contrato: 'franquia' (tem valor) / 'partner' (de graça)
 previsao = load('previsao.xlsx')
 agendadores_leads = load('agendadores_leads_recebidos.xlsx')
@@ -81,6 +82,8 @@ if not deals_p65.empty:
     deals_p65 = deals_p65[~deals_p65['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not deals_p69.empty:
     deals_p69 = deals_p69[~deals_p69['deal_id'].isin(config.DEALS_EXCLUIDOS)]
+if not deals_p72.empty:
+    deals_p72 = deals_p72[~deals_p72['deal_id'].isin(config.DEALS_EXCLUIDOS)]
 if not previsao.empty:
     previsao = previsao[~previsao['deal_id'].isin(config.PREVISAO_EXCLUIDOS)]
 
@@ -949,12 +952,18 @@ inbound_data = build_page(
         config.PIPELINE_REBARBA_STUDIO_FISCAL,
         config.PIPELINE_OUTBOUND_STUDIO_FISCAL,
         config.PIPELINE_OUTBOUND_EVENTOS,
+        # Fenalaw 2026 (pipeline 72) — compartilhado com a Agro, só conta aqui
+        # quando um dos 4 closers da Fiscal é o dono do negócio (ver deals.xlsx,
+        # que já cobre qualquer pipeline que um closer assuma); pedido do time
+        # (30/10/2026).
+        config.PIPELINE_FENALAW_2026,
     ],
     previsao_todos_funis=True,
     contrato_enviado_extra=[
         (deals_p65, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_REBARBA]),
         (deals_p66, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_OUTBOUND]),
         (deals_p69, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS]),
+        (deals_p72, [config.PIPELINE_STAGE_CONTRATO_ENVIADO_FENALAW]),
     ],
 )
 # "Consolidado do time" (Inbound) ganha 2 etapas antes da CC1 — Leads iniciados (já

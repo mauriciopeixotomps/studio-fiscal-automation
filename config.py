@@ -167,6 +167,14 @@ PIPELINE_STAGE_OPORTUNIDADE_REBARBA = 628
 PIPELINE_OUTBOUND_EVENTOS = 69
 PIPELINE_STAGE_CONTRATO_ENVIADO_EVENTOS = 721
 
+# Funil "Fenalaw 2026" (pipeline 72, criado 19/10/2026) — leads captados no estande
+# da feira, compartilhado entre Fiscal e Agro, ainda sem dono de closer (owner_id
+# vazio pra quase todo mundo). Sem etiqueta de marca — conta pro painel de quem
+# acabar assumindo o negócio como closer (pedido do time, 30/10/2026); enquanto não
+# tem dono de nenhum dos dois times, não aparece em nenhum painel.
+PIPELINE_FENALAW_2026 = 72
+PIPELINE_STAGE_CONTRATO_ENVIADO_FENALAW = 748
+
 # ============= HISTÓRICO DE MESES (menu "Histórico", 01/09/2026) =============
 # O link de "mês anterior" só dá pra andar um mês de cada vez — uma vez que um mês
 # congela, ele fica preso com o link que tinha quando era o mês atual (ex:

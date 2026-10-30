@@ -751,4 +751,7 @@ df_p65 = _fetch_pipeline_deals(config.PIPELINE_REBARBA_STUDIO_FISCAL, 'REBARBA S
 # ============= OUTBOUND - EVENTOS (pipeline 69) — reportado junto com o Outbound =============
 df_p69 = _fetch_pipeline_deals(config.PIPELINE_OUTBOUND_EVENTOS, 'OUTBOUND - EVENTOS')
 
+# ============= FENALAW 2026 (pipeline 72) — compartilhado com a Studio Agro =============
+df_p72 = _fetch_pipeline_deals(config.PIPELINE_FENALAW_2026, 'FENALAW 2026')
+
 print(f'\nDados salvos em {OUT_DIR}/')

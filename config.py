@@ -26,6 +26,8 @@ FETCH_START = date(_today.year, _today.month, 1)
 FETCH_END = date(_today.year, _today.month, 28) if _today.month == 12 else date(_today.year, _today.month + 1, 28)
 
 # ============= CLOSERS =============
+# Adalberto Neto saiu em 03/11/2026 — passou a integrar o time da Studio Agro,
+# não conta mais aqui.
 CLOSERS = [
     {
         'id': 22760768,
@@ -33,13 +35,6 @@ CLOSERS = [
         'email': 'leonardo.ribeiro@grupostudio.com.br',
         'foto': 'https://usericons.pipedrive.com/profile_120x120_22760768_5329c507a3b64e959d03f5aea84e92a7.jpg',
         'apelidos_planilha': {'leo', 'leonardo'},
-    },
-    {
-        'id': 24688510,
-        'nome': 'Adalberto Neto',
-        'email': 'adalberto.neto@grupostudio.com.br',
-        'foto': 'https://usericons.pipedrive.com/profile_120x120_24688510_1a239cdc0558254144dce6bc90463a9a.jpg',
-        'apelidos_planilha': {'adalberto', 'adalberto neto'},
     },
     {
         'id': 23882023,
@@ -70,9 +65,10 @@ AGENDADORES = [
         'email': 'jonatans.junior@grupostudio.com.br',
     },
     {
-        'id': 24165647,
-        'nome': 'Leonardo Soares',
-        'email': 'leonardo.soares@grupostudio.com.br',
+        # Entrou em 03/11/2026, no lugar de Leonardo Soares (saiu).
+        'id': 27556903,
+        'nome': 'Jailson Ribas',
+        'email': 'jailson.ribas@grupostudio.com.br',
     },
 ]
 AGENDADOR_IDS = [a['id'] for a in AGENDADORES]

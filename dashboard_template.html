@@ -333,6 +333,18 @@
     .card > h2, .relatorio-toolbar { break-after: avoid; page-break-after: avoid; }
     .card-row { display: block; }
     .card-row .card { width: 100%; }
+    /* 5º ajuste (03/11/2026): achado no PDF real — tabela comprida (Previsão,
+       Relatório por closer, Mapa de calor) que quebra no meio entre duas
+       páginas aparecia na página seguinte SEM o cabeçalho (th), só com as
+       linhas de dados/totais soltas, sem dar pra saber o que é cada coluna.
+       Causa: bug conhecido do Chrome — com border-collapse:collapse, o
+       thead não se repete a cada página impressa; só se repete com
+       border-collapse:separate. Aplica só na impressão (na tela continua
+       collapse, igual sempre foi) — como as tabelas daqui só têm borda
+       embaixo de cada linha (nunca borda em cima, nem borda vertical),
+       trocar pra separate não gera linha dupla em nenhuma tabela normal. */
+    table { border-collapse: separate; border-spacing: 0; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
   }
 
   /* ===== Seções por funil (painel unificado) — refatoração multi-funil ===== */

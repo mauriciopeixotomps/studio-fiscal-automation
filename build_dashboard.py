@@ -1007,6 +1007,21 @@ rebarba_data = build_page(
     tem_meta=False,
     funil_nome='REBARBA',
 )
+# Fenalaw 2026 (72) — pipeline compartilhado com a Studio Agro (evento único);
+# aqui só entra pela ótica da Fiscal, com os closers da Fiscal como dono (os
+# mesmos negócios já contam no Placar/Contrato enviado do Inbound via
+# scoreboard_pipeline_ids/contrato_enviado_extra acima). Ganha seção própria
+# no painel unificado a pedido do time (30/10/2026), ainda sem meta.
+fenalaw_data = build_page(
+    pipeline_ids=[config.PIPELINE_FENALAW_2026],
+    deals_p=deals_p72,
+    stages_contrato_enviado=[config.PIPELINE_STAGE_CONTRATO_ENVIADO_FENALAW],
+    leads_mode='criado',
+    meta_leads=None,
+    meta_contratos_val=None,
+    tem_meta=False,
+    funil_nome='FENALAW',
+)
 
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
 # Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM
@@ -1072,7 +1087,7 @@ HISTORICO_OUTBOUND = _historico(config.HISTORICO_INICIO_OUTBOUND, 'outbound', 'o
 HISTORICO_REBARBA = _historico(config.HISTORICO_INICIO_REBARBA, 'rebarba', 'rebarba.html')
 
 PAGINAS_IRMAS = {
-    'inbound': {'url': 'index.html', 'label': 'Studio Fiscal (Inbound)'},
+    'inbound': {'url': 'index.html', 'label': 'Studio Fiscal (painel unificado)'},
     'outbound': {'url': 'outbound.html', 'label': 'Outbound'},
     'rebarba': {'url': 'rebarba.html', 'label': 'Rebarba (reativação)'},
 }
@@ -1082,16 +1097,35 @@ def _paginas_irmas(exceto):
     return [v for k, v in PAGINAS_IRMAS.items() if k != exceto]
 
 
-dashboard_inbound = {
+# Métricas padrão do "Relatório por closer" quando o funil não tem CC1 como
+# porta de entrada (Outbound/Rebarba/Fenalaw — cada closer já entra com o
+# próprio lead, "Leads" é que mede produtividade aqui, não "Negócios
+# iniciados" como no Inbound).
+_RELATORIO_METRICS_PADRAO = [
+    ['leads', 'Leads'],
+    ['cc1_realizada', 'CC1 realizada'],
+    ['cc1_futura', 'CC1 a acontecer'],
+    ['fpq_realizada', 'FPQ recebida'],
+    ['cc2_realizada', 'CC2 realizada'],
+    ['cc2_futura', 'CC2 a acontecer'],
+    ['cc3_realizada', 'CC3 realizada'],
+    ['cc3_futura', 'CC3 a acontecer'],
+    ['contrato_enviado', 'Contrato enviado'],
+    ['contratos', 'Contratos fechados'],
+    ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
+    ['contratos_partner', 'Contratos Partner (grátis)'],
+    ['no_show', 'No-show'],
+]
+
+# ============= Dict de dados de CADA funil (seção do painel unificado E,
+# pra Outbound/Rebarba, também a página single-funil própria) — "dados_X"
+# nunca ganha a chave 'funis' nele mesmo (só os dicts de PÁGINA, montados
+# depois, ganham isso), pra não criar referência circular no JSON. =============
+dados_inbound = {
     **common,
     **inbound_data,
     'agendadores': agendadores_out,
     'agendadores_meta': agendadores_meta,
-    'pagina_titulo': 'Equipe de Vendas — Studio Fiscal',
-    'paginas_irmas': _paginas_irmas('inbound'),
-    'historico': HISTORICO_INBOUND,
-    'mes_outro_url': MES_ANTERIOR_ARQUIVO,
-    'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Studio Fiscal Franquia no mês',
     'relatorio_hint': (
         '— diário, semanal e consolidado do mês. "Negócios iniciados" conta a união '
@@ -1114,66 +1148,80 @@ dashboard_inbound = {
         ['no_show', 'No-show'],
     ],
 }
-dashboard_outbound = {
+dados_outbound = {
     **common,
     **outbound_data,
-    'pagina_titulo': 'Equipe de Vendas — Outbound',
-    'paginas_irmas': _paginas_irmas('outbound'),
-    'historico': HISTORICO_OUTBOUND,
-    'mes_outro_url': MES_ANTERIOR_ARQUIVO_OUTBOUND,
-    'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos nos funis Outbound + Eventos da Studio Fiscal no mês',
     'relatorio_hint': (
         '— diário, semanal e consolidado do mês. Junta o funil Outbound próprio (66) '
         'com o Outbound - Eventos (69). "Leads" conta negócios criados no mês já com '
         'um closer como dono'
     ),
-    # Aqui "Leads" continua — ainda não tem CC1 nesse funil, então é a única
-    # métrica de produtividade disponível por enquanto.
-    'relatorio_metrics': [
-        ['leads', 'Leads'],
-        ['cc1_realizada', 'CC1 realizada'],
-        ['cc1_futura', 'CC1 a acontecer'],
-        ['fpq_realizada', 'FPQ recebida'],
-        ['cc2_realizada', 'CC2 realizada'],
-        ['cc2_futura', 'CC2 a acontecer'],
-        ['cc3_realizada', 'CC3 realizada'],
-        ['cc3_futura', 'CC3 a acontecer'],
-        ['contrato_enviado', 'Contrato enviado'],
-        ['contratos', 'Contratos fechados'],
-        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
-        ['contratos_partner', 'Contratos Partner (grátis)'],
-        ['no_show', 'No-show'],
-    ],
+    'relatorio_metrics': _RELATORIO_METRICS_PADRAO,
 }
-dashboard_rebarba = {
+dados_rebarba = {
     **common,
     **rebarba_data,
-    'pagina_titulo': 'Equipe de Vendas — Rebarba (reativação)',
-    'paginas_irmas': _paginas_irmas('rebarba'),
-    'historico': HISTORICO_REBARBA,
-    'mes_outro_url': MES_ANTERIOR_ARQUIVO_REBARBA,
-    'mes_outro_label': MES_ANTERIOR_LABEL,
     'perdidos_hint': '— negócios perdidos no funil Rebarba Studio Fiscal Franquia no mês',
     'relatorio_hint': (
         '— diário, semanal e consolidado do mês. Reativação de negócios perdidos do '
         'funil Studio Fiscal Franquia. "Leads" conta negócios criados no mês já com '
         'um closer como dono'
     ),
-    'relatorio_metrics': [
-        ['leads', 'Leads'],
-        ['cc1_realizada', 'CC1 realizada'],
-        ['cc1_futura', 'CC1 a acontecer'],
-        ['fpq_realizada', 'FPQ recebida'],
-        ['cc2_realizada', 'CC2 realizada'],
-        ['cc2_futura', 'CC2 a acontecer'],
-        ['cc3_realizada', 'CC3 realizada'],
-        ['cc3_futura', 'CC3 a acontecer'],
-        ['contrato_enviado', 'Contrato enviado'],
-        ['contratos', 'Contratos fechados'],
-        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
-        ['contratos_partner', 'Contratos Partner (grátis)'],
-        ['no_show', 'No-show'],
+    'relatorio_metrics': _RELATORIO_METRICS_PADRAO,
+}
+dados_fenalaw = {
+    **common,
+    **fenalaw_data,
+    'perdidos_hint': '— negócios perdidos no pipeline Fenalaw 2026 no mês, entre os negócios já com dono entre os closers da Fiscal',
+    'relatorio_hint': (
+        '— diário, semanal e consolidado do mês. Pipeline compartilhado com a Studio '
+        'Agro (evento Fenalaw 2026) — só entra aqui quando o dono é um dos closers da '
+        'Fiscal. "Leads" conta negócios criados no mês já com um closer como dono'
+    ),
+    'relatorio_metrics': _RELATORIO_METRICS_PADRAO,
+}
+
+dashboard_outbound = {
+    **dados_outbound,
+    'pagina_titulo': 'Equipe de Vendas — Outbound',
+    'paginas_irmas': _paginas_irmas('outbound'),
+    'historico': HISTORICO_OUTBOUND,
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO_OUTBOUND,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
+    'funis': [{'sufixo': 'outbound', 'cor': '#38bdf8', 'titulo': 'OUTBOUND', 'badge': '+ Eventos', 'dados': dados_outbound}],
+}
+dashboard_rebarba = {
+    **dados_rebarba,
+    'pagina_titulo': 'Equipe de Vendas — Rebarba (reativação)',
+    'paginas_irmas': _paginas_irmas('rebarba'),
+    'historico': HISTORICO_REBARBA,
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO_REBARBA,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
+    'funis': [{'sufixo': 'rebarba', 'cor': '#22c55e', 'titulo': 'REBARBA', 'badge': 'reativação', 'dados': dados_rebarba}],
+}
+
+# ============= Painel unificado (index.html) — as 4 seções (Inbound,
+# Outbound, Rebarba, Fenalaw) empilhadas numa página só, cada uma com seu
+# próprio card completo (Placar/Metas/Ritmo/Consolidado/Perdidos/
+# Comparativo/Ranking/Relatório/Previsão/Mapa de calor/FPQs), em vez de 3
+# páginas separadas. Decidido com o time via mockup (Opção B — "tudo
+# empilhado, uma seção por funil"), 03/11/2026. =============
+dashboard_unificada = {
+    **common,
+    'pagina_titulo': 'Equipe de Vendas — Studio Fiscal (painel unificado)',
+    # Não tem mais "página irmã" pra linkar — o ponto é não precisar navegar
+    # entre páginas pra ver os 4 funis. outbound.html/rebarba.html continuam
+    # existindo (linkadas lá, não daqui) pra quem tiver o link salvo.
+    'paginas_irmas': [],
+    'historico': HISTORICO_INBOUND,
+    'mes_outro_url': MES_ANTERIOR_ARQUIVO,
+    'mes_outro_label': MES_ANTERIOR_LABEL,
+    'funis': [
+        {'sufixo': 'inbound', 'cor': '#a855f7', 'titulo': 'INBOUND', 'badge': 'painel principal', 'dados': dados_inbound},
+        {'sufixo': 'outbound', 'cor': '#38bdf8', 'titulo': 'OUTBOUND', 'badge': '+ Eventos', 'dados': dados_outbound},
+        {'sufixo': 'rebarba', 'cor': '#22c55e', 'titulo': 'REBARBA', 'badge': 'reativação', 'dados': dados_rebarba},
+        {'sufixo': 'fenalaw', 'cor': '#f97316', 'titulo': 'FENALAW 2026', 'badge': 'novo · compartilhado com Agro', 'dados': dados_fenalaw},
     ],
 }
 
@@ -1194,7 +1242,7 @@ def render(dashboard, out_name):
     return out_path
 
 
-render(dashboard_inbound, 'index.html')
+render(dashboard_unificada, 'index.html')
 render(dashboard_outbound, 'outbound.html')
 render(dashboard_rebarba, 'rebarba.html')
 
@@ -1203,15 +1251,19 @@ render(dashboard_rebarba, 'rebarba.html')
 # link de navegação: em vez de apontar pro mês anterior, aponta de volta pro mês
 # atual (genérico, sem citar o mês por nome, pra não ficar desatualizado quando esse
 # arquivo congelar e passar a ser visto meses depois).
-render({**dashboard_inbound, 'mes_outro_url': 'index.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL)
+render({**dashboard_unificada, 'mes_outro_url': 'index.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL)
 render({**dashboard_outbound, 'mes_outro_url': 'outbound.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL_OUTBOUND)
 render({**dashboard_rebarba, 'mes_outro_url': 'rebarba.html', 'mes_outro_label': '← Ver mês atual'}, ARQUIVO_MES_ATUAL_REBARBA)
 
-ci = dashboard_inbound['consolidado']
+ci = dados_inbound['consolidado']
 print(f"Inbound (Studio Fiscal) — CC1={ci['cc1_realizada']} | FPQ={ci['fpq_realizada']} | "
       f"CC2={ci['cc2_realizada']} | CC3={ci['cc3_realizada']} | "
       f"Contratos={ci['contratos']}/{metas['meta_contratos']}")
-co = dashboard_outbound['consolidado']
+co = dados_outbound['consolidado']
 print(f"Outbound — CC1={co['cc1_realizada']} | FPQ={co['fpq_realizada']} | "
       f"CC2={co['cc2_realizada']} | CC3={co['cc3_realizada']} | "
       f"Leads criados no mês={co['leads_atribuidos_closers']} | Contratos={co['contratos']}")
+cf = dados_fenalaw['consolidado']
+print(f"Fenalaw 2026 — CC1={cf['cc1_realizada']} | FPQ={cf['fpq_realizada']} | "
+      f"CC2={cf['cc2_realizada']} | CC3={cf['cc3_realizada']} | "
+      f"Leads criados no mês={cf['leads_atribuidos_closers']} | Contratos={cf['contratos']}")

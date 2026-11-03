@@ -1,9 +1,12 @@
 """
-Detecta negócios no Pipedrive que ganharam Produto + Valor + Data de Fechamento
-Esperada (os 3 campos que, juntos, indicam que o closer já está tratando o
+Detecta negócios no Pipedrive que ganharam Produto + Data de Fechamento
+Esperada (os 2 campos que, juntos, indicam que o closer já está tratando o
 negócio como uma previsão de venda) e que ainda NÃO estão na planilha de
 Previsão — e adiciona uma linha nova pra cada um, seguindo o padrão de
-preenchimento das linhas manuais.
+preenchimento das linhas manuais. Negócio modelo Parceria (Venda R$0) entra
+igual, desde que já tenha o produto "Contrato Partner" vinculado — pedido do
+time (03/11/2026): antes só entrava quando Ganho, mas Parceria em aberto
+também é previsão (de fechamento, não de receita) e tem que aparecer.
 
 Roda depois de fetch_pipedrive.py (usa data_pipedrive/deals.xlsx, que precisa
 ter as colunas 'expected_close_date' e 'pessoa_nome') e antes de
@@ -323,7 +326,6 @@ if df.empty or 'expected_close_date' not in df.columns:
 candidatos = df[
     (df['status'] == 'open')
     & df['pipeline_id'].isin(config.FUNIL_POR_PIPELINE.keys())
-    & df['valor'].fillna(0).gt(0)
     & df['expected_close_date'].notna()
     & ~df['deal_id'].isin(deal_ids_existentes)
 ].copy()
@@ -348,7 +350,7 @@ if not candidatos.empty and nomes_existentes:
     _nome_lead = candidatos.apply(lambda r: _norm_nome(r.get('pessoa_nome') or r.get('titulo') or ''), axis=1)
     candidatos = candidatos[~_nome_lead.isin(nomes_existentes)]
 
-print(f'   {len(candidatos)} negócio(s) aberto(s) com valor + data esperada, ainda não na planilha (antes de checar produto vinculado)')
+print(f'   {len(candidatos)} negócio(s) aberto(s) com data esperada, ainda não na planilha (antes de checar produto vinculado)')
 
 # ============= 3) Confirma produto vinculado (o 3º critério pedido) e monta as linhas =============
 # A trava de segurança (MAX_NOVOS_POR_CICLO) é checada só DEPOIS desse filtro —

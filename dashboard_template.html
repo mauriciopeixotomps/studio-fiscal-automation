@@ -345,15 +345,7 @@
        trocar pra separate não gera linha dupla em nenhuma tabela normal. */
     table { border-collapse: separate; border-spacing: 0; }
     tr { break-inside: avoid; page-break-inside: avoid; }
-    /* 6º ajuste (04/11/2026): o fix acima não resolve o caso em que TODAS as
-       linhas de negócio da Previsão já couberam na página e só o bloco de
-       totais (tfoot) sobra pra página seguinte sozinho — Chrome só repete
-       thead junto de continuação de tbody, não de tfoot isolado. A linha
-       .tfoot-print-header (réplica do cabeçalho, injetada no JS como 1ª linha
-       do tfoot) cobre esse caso — fica escondida na tela, só aparece aqui. */
-    .tfoot-print-header { display: table-row; }
   }
-  .tfoot-print-header { display: none; }
 
   /* ===== Seções por funil (painel unificado) — refatoração multi-funil ===== */
   .funil-section { margin-bottom: 8px; }
@@ -1145,21 +1137,6 @@ function previsaoProximoMes(r) {
   return !!r.data_fechamento_esperada && r.data_fechamento_esperada > _previsaoPeriodoFim;
 }
 let _previsaoPeriodoFim = null;
-// Linha-réplica do cabeçalho da tabela de Previsão, injetada como a 1ª linha
-// do <tfoot> (some na tela via CSS, só aparece na impressão — ver
-// .tfoot-print-header no @media print). Resolve um caso que o fix de
-// border-collapse (03/11/2026) não cobre: quando TODAS as linhas de negócio
-// cabem na página atual e só o bloco de totais (tfoot) sobra pra página
-// seguinte, o Chrome não repete o <thead> ali (ele só repete thead junto de
-// uma continuação do <tbody>, não de um <tfoot> sozinho) — a página virava só
-// números soltos, sem saber qual coluna é Venda/Caixa/Venda realizada/etc.
-// Como o tfoot nunca quebra no meio (tr tem break-inside:avoid), essa linha
-// sempre viaja junto pra onde quer que o bloco de totais vá parar.
-const PREVISAO_TFOOT_PRINT_HEADER = `<tr class="tfoot-print-header">
-  <th>Data registro</th><th>Closer</th><th>Funil</th><th>Lead</th><th>Modelo</th><th>Bandeira</th><th>Confiança</th><th>Prob.</th>
-  <th>Venda</th><th>Caixa</th><th>Fechamento esperado</th><th>Status</th>
-  <th>Venda realizada</th><th>Caixa realizado</th><th>Deal</th>
-</tr>`;
 function renderPrevisaoTable(D, sufixo) {
   _previsaoPeriodoFim = D.periodo_fim;
   const tbody = document.querySelector('#previsao-table-' + sufixo + ' tbody');
@@ -1194,7 +1171,6 @@ function renderPrevisaoTable(D, sufixo) {
     return previsaoTotalRowHtml(`Total ${nome}`, D.previsao.filter(r => r.funil === f));
   }).join('') : '';
   document.querySelector('#previsao-table-' + sufixo + ' tfoot').innerHTML = D.previsao.length ? (
-    PREVISAO_TFOOT_PRINT_HEADER +
     previsaoEmNegociacaoFechadoRowsHtml(D.previsao) +
     linhasPorFunil +
     previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +

@@ -330,7 +330,17 @@
        conteúdo entre páginas de impressão, o navegador simplesmente descarta
        o que não coube. Corrigido virando bloco empilhado só na impressão,
        que aí flui e pagina normalmente como o resto do site. */
-    .card > h2, .relatorio-toolbar { break-after: avoid; page-break-after: avoid; }
+    /* 7º ajuste (05/11/2026): o break-after acima evita começar a quebra
+       LOGO DEPOIS do título, mas não protegia o título em si — quando o h2
+       tem um .hint comprido (quebra em 2 linhas), a quebra de página podia
+       cair NO MEIO do próprio título, cortando a frase do hint entre duas
+       páginas (achado real no "Relatório por closer" do Outbound). Com
+       break-inside:avoid o título (com o hint) sempre pula inteiro pra
+       página seguinte quando não cabe o resto dele na atual. */
+    .card > h2, .relatorio-toolbar {
+      break-after: avoid; page-break-after: avoid;
+      break-inside: avoid; page-break-inside: avoid;
+    }
     .card-row { display: block; }
     .card-row .card { width: 100%; }
     /* 5º ajuste (03/11/2026): achado no PDF real — tabela comprida (Previsão,

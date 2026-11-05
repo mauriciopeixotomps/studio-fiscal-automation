@@ -120,10 +120,12 @@ def _correct_activity_tz(a):
     a = dict(a)
     a['due_date'], a['due_time'] = _fix_due(a.get('due_date'), a.get('due_time'))
     a['marked_as_done_time'] = _fix_dt(a.get('marked_as_done_time'))
+    a['add_time'] = _fix_dt(a.get('add_time'))
     return a
 
 
 CLOSER_NAME = {c['id']: c['nome'] for c in config.CLOSERS}
+AGENDADOR_NOME = {a['id']: a['nome'] for a in config.AGENDADORES}
 
 # ============= ACTIVITIES =============
 # (activity_type, tem_para_acontecer)
@@ -158,6 +160,12 @@ def act_row(a):
         'due_time': a.get('due_time'),
         'marked_as_done_time': a.get('marked_as_done_time'),
         'done': a.get('done'),
+        # Quem CRIOU a tarefa (difere do responsável/closer_id quando um dos
+        # agendadores cria a CC1 e deixa agendada pro closer) — usado pra
+        # atribuir "agendamentos"/"realizadas" do Time de agendamento pelo
+        # criador da própria CC1, não mais por uma atividade separada de
+        # "agendamento" (ver bloco AGENDADORES abaixo, 05/11/2026).
+        'criador_id': a.get('created_by_user_id'),
     }
 
 
@@ -194,6 +202,21 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
     all_realizada[stage_key] = realizada
     if stage_key == 'cc1':
         cc1_realizada_rows = realizada
+        # CC1 (qualquer status — realizada, futura, ou ainda em aberto sem
+        # due_date no mês) que um dos agendadores CRIOU, não importa o
+        # closer/funil pra quem ficou — "agendamentos"/"realizadas" do Time
+        # de agendamento usam isso direto (ver build_dashboard.py), em vez da
+        # atividade separada "agendamento_de_cc1" de antes (pedido do time,
+        # 05/11/2026: SDR pode criar CC1 em qualquer funil da Fiscal, não só
+        # o pipeline 62). Mês = quando o SDR CRIOU a CC1 (add_time), não
+        # quando ela está marcada pra acontecer nem quando foi concluída —
+        # mantém o mesmo sentido ("quanto ele agendou esse mês") de antes.
+        cc1_criadas_agendador_rows = [
+            {**act_row(a), 'criador_nome': AGENDADOR_NOME.get(a.get('created_by_user_id'))}
+            for a in raw
+            if a.get('created_by_user_id') in config.AGENDADOR_IDS
+            and _in_range(a.get('add_time'), config.MONTH_START, config.MONTH_END)
+        ]
     print(f'   {stage_key} realizada: {len(realizada)}')
     if tem_futura:
         futura = [act_row(a) for a in raw
@@ -305,66 +328,18 @@ pd.DataFrame(cc1_realizada_rows).to_excel(os.path.join(OUT_DIR, 'activities_cc1_
 pd.DataFrame(no_show_rows).to_excel(os.path.join(OUT_DIR, 'activities_no_show.xlsx'), index=False)
 pd.DataFrame(qualificacao_rows).to_excel(os.path.join(OUT_DIR, 'activities_qualificacao_realizada.xlsx'), index=False)
 
-# ============= AGENDADORES (leads recebidos / agendamentos / realizadas) =============
-# "Leads recebidos" = 1ª tentativa de contato criada pro agendador (due_date = quando
-# o lead caiu pra ele). "Agendamento" = CC1 marcada como agendada por ele (manual ou
-# bot), concluída (done) no mês. "Realizada" cruza o negocio_id do agendamento com os
-# CC1 Realizada já buscados acima (activities_cc1_realizada, cc1_realizada_rows) — a
-# CC1 em si fica na agenda do closer, não do agendador.
-print('-> Fetching atividades dos agendadores (leads recebidos / agendamentos)...')
-AGENDADOR_NOME = {a['id']: a['nome'] for a in config.AGENDADORES}
-
-
-def _fetch_agendador_activities(act_type, agendador_id):
-    rows = fetch_all('activities', {
-        'type': act_type,
-        'user_id': agendador_id,
-        'start_date': config.FETCH_START.isoformat(),
-        'end_date': config.FETCH_END.isoformat(),
-    })
-    return act_type, agendador_id, rows
-
-
-agendador_tasks = [
-    (act_type, aid)
-    for act_type in (config.ACT_TENTATIVA_1, config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)
-    for aid in config.AGENDADOR_IDS
-]
-agendador_raw = {act_type: [] for act_type in (config.ACT_TENTATIVA_1, config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)}
-with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
-    futures = [executor.submit(_fetch_agendador_activities, act_type, aid) for act_type, aid in agendador_tasks]
-    for f in concurrent.futures.as_completed(futures):
-        act_type, agendador_id, rows = f.result()
-        agendador_raw[act_type].extend(rows)
-        print(f'   {act_type} / {AGENDADOR_NOME.get(agendador_id)}: {len(rows)}')
-
-tentativa1_rows = []
-for a in agendador_raw[config.ACT_TENTATIVA_1]:
-    a = _correct_activity_tz(a)
-    due = a.get('due_date')
-    if due and _in_range(due, config.MONTH_START, config.MONTH_END):
-        tentativa1_rows.append({
-            'agendador_id': a.get('user_id'),
-            'agendador_nome': AGENDADOR_NOME.get(a.get('user_id')),
-            'negocio_id': a.get('deal_id'),
-            'due_date': due,
-        })
-pd.DataFrame(tentativa1_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_leads_recebidos.xlsx'), index=False)
-
-agendamento_rows = []
-for act_type in (config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT):
-    for a in agendador_raw[act_type]:
-        a = _correct_activity_tz(a)
-        if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END):
-            agendamento_rows.append({
-                'agendador_id': a.get('user_id'),
-                'agendador_nome': AGENDADOR_NOME.get(a.get('user_id')),
-                'negocio_id': a.get('deal_id'),
-                'tipo': act_type,
-                'marked_as_done_time': a.get('marked_as_done_time'),
-            })
-pd.DataFrame(agendamento_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_agendamentos.xlsx'), index=False)
-print(f'   leads recebidos (mês, todos agendadores): {len(tentativa1_rows)} | agendamentos concluídos: {len(agendamento_rows)}')
+# ============= AGENDADORES (agendamentos / realizadas) =============
+# "Agendamentos"/"realizadas" usam direto o criador da própria CC1
+# (cc1_criadas_agendador_rows, montado lá em cima junto com o resto da CC1) —
+# qualquer funil, desde que o agendador tenha criado a tarefa. Substitui a
+# atividade separada "agendamento_de_cc1"/"...bot" de antes (05/11/2026):
+# aquela ficava restrita, na prática, a cruzar por negocio_id com a CC1
+# Realizada do pipeline 62 — não pegava CC1 criada por um agendador mas
+# realizada num funil diferente (ex: Rebarba, Outbound). "Leads recebidos"
+# não muda — continua vindo do bloco "deals dos agendadores" (qualquer
+# pipeline) mais abaixo, não de uma atividade.
+pd.DataFrame(cc1_criadas_agendador_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_cc1_criadas.xlsx'), index=False)
+print(f'   CC1 criadas por agendadores no mês (qualquer funil): {len(cc1_criadas_agendador_rows)}')
 
 # ============= DEALS (leads + contratos) =============
 print('-> Fetching deals por closer (proprietário)...')

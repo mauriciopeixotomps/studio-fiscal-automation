@@ -321,8 +321,33 @@
     /* Previsão tem 15 colunas — a mais larga de todas (closer/funil/lead/
        modelo/bandeira/confiança/prob./venda/caixa/data/status/venda
        realizada/caixa realizado/deal); margem extra de segurança além da
-       correção de largura acima. */
-    #previsao-table th, #previsao-table td { font-size: 10px !important; padding: 4px 6px !important; }
+       correção de largura acima.
+       9º ajuste (05/11/2026): esse seletor usava #previsao-table (ID exato)
+       — mas a tabela de verdade no HTML é previsao-table-geral ou
+       previsao-table-${sufixo} (SEMPRE com sufixo, nunca só "previsao-table"
+       sozinho). Ou seja, essa regra (e as duas de baixo) nunca bateu em
+       nada desde o ajuste original de 22/10 — a tabela de Previsão nunca
+       teve font-size/padding/table-layout reduzidos de verdade, só a
+       tabela "Relatório por closer" (que usa a classe .relatorio-table-wrap,
+       essa sim batendo certo). Troca pro seletor de atributo [id^=...], que
+       casa com qualquer sufixo. */
+    [id^="previsao-table"] th, [id^="previsao-table"] td {
+      white-space: normal !important; font-size: 10px !important; padding: 4px 6px !important;
+    }
+    /* 8º ajuste (05/11/2026): achado real no PDF exportado — mesmo com a
+       largura do body corrigida (289mm) e fonte/padding menores, essas duas
+       tabelas (15 e 13 colunas) continuavam mais largas que a página e a(s)
+       última(s) coluna(s) ("Deal", "Caixa realizado") saíam cortadas pra fora
+       da borda direita — table-layout:auto (padrão) deixa o conteúdo de cada
+       célula "empurrar" a tabela pra além dos 100% do container quando não
+       cabe, ignorando a largura do pai. table-layout:fixed trava a tabela
+       nos 100% de verdade (nunca mais larga que o body) e obriga o conteúdo
+       de cada célula a quebrar linha em vez de alargar a coluna. */
+    [id^="previsao-table"], .relatorio-table-wrap table { table-layout: fixed !important; }
+    [id^="previsao-table"] td, [id^="previsao-table"] th,
+    .relatorio-table-wrap table td, .relatorio-table-wrap table th {
+      overflow-wrap: break-word !important; word-break: break-word !important;
+    }
     /* 3º ajuste (08/09/2026): dois problemas achados no PDF real exportado —
        (1) título de seção (h2) ficando sozinho no fim de uma página, com o
        conteúdo dele só começando na página seguinte ("Comparativo entre

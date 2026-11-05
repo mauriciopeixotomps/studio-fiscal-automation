@@ -1023,6 +1023,57 @@ fenalaw_data = build_page(
     funil_nome='FENALAW',
 )
 
+# ============= "GERAL" — funil consolidado e Relatório por closer somando os
+# 4 funis juntos (Inbound/Rebarba/Outbound/Fenalaw), pra mostrar na Visão
+# Geral do painel unificado (pedido do time, 05/11/2026). Mesma ideia do
+# Placar/Previsão lá em cima (scoreboard_pipeline_ids/previsao_todos_funis) —
+# só que esses dois (closers/consolidado) nunca eram somados entre funis,
+# cada build_page() calcula só pro(s) pipeline(s) dele. Fica pendurado em
+# inbound_data (igual placar/previsão) pro JS reaproveitar o mesmo padrão
+# "D.funis[0].dados.X" já usado na Visão Geral.
+_METRICAS_SOMAVEIS = [
+    'cc1_realizada', 'cc1_futura', 'fpq_realizada', 'cc2_realizada', 'cc2_futura',
+    'cc3_realizada', 'cc3_futura', 'contrato_enviado', 'leads', 'contratos',
+    'contratos_franquia', 'contratos_partner', 'no_show',
+]
+
+
+def _soma_diarios(diarios):
+    out = {}
+    for d in diarios:
+        for k, v in (d or {}).items():
+            out[k] = out.get(k, 0) + v
+    return out
+
+
+_funis_para_geral = [inbound_data, outbound_data, rebarba_data, fenalaw_data]
+closers_geral = []
+for c in config.CLOSERS:
+    por_funil = [next(cc for cc in fd['closers'] if cc['nome'] == c['nome']) for fd in _funis_para_geral]
+    m = {k: sum(cc[k] for cc in por_funil) for k in _METRICAS_SOMAVEIS}
+    m['conversao'] = {
+        'cc1_para_fpq': pct(m['fpq_realizada'], m['cc1_realizada']),
+        'fpq_para_cc2': pct(m['cc2_realizada'], m['fpq_realizada']),
+        'cc2_para_cc3': pct(m['cc3_realizada'], m['cc2_realizada']),
+    }
+    m['pct_no_show'] = pct(m['no_show'], m['cc1_realizada'] + m['no_show'])
+    diario_keys = por_funil[0]['diario'].keys()
+    diario = {dk: _soma_diarios([cc['diario'].get(dk) for cc in por_funil]) for dk in diario_keys}
+    closers_geral.append({'nome': c['nome'], 'foto': c['foto'], **m, 'diario': diario})
+
+consolidado_geral = {k: sum(cc[k] for cc in closers_geral) for k in _METRICAS_SOMAVEIS}
+consolidado_geral['conversao'] = {
+    'cc1_para_fpq': pct(consolidado_geral['fpq_realizada'], consolidado_geral['cc1_realizada']),
+    'fpq_para_cc2': pct(consolidado_geral['cc2_realizada'], consolidado_geral['fpq_realizada']),
+    'cc2_para_cc3': pct(consolidado_geral['cc3_realizada'], consolidado_geral['cc2_realizada']),
+}
+consolidado_geral['pct_no_show'] = pct(consolidado_geral['no_show'], consolidado_geral['cc1_realizada'] + consolidado_geral['no_show'])
+# "Leads qualificados"/"Agendado" só existem no funil do Inbound (é o time de
+# qualificação/SDR que faz isso, não um conceito que exista em Outbound/
+# Rebarba/Fenalaw) — pega direto do Inbound em vez de somar.
+consolidado_geral['leads_qualificados'] = inbound_data['consolidado']['leads_qualificados']
+consolidado_geral['cc1_agendado'] = inbound_data['consolidado']['cc1_agendado']
+
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
 # Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM
 # num arquivo próprio (ex: agosto-2026.html), além do index.html normal — com os
@@ -1133,6 +1184,26 @@ dados_inbound = {
         'entraram no funil Expansão Franquia Studio Fiscal já com ele como dono no mês'
     ),
     'relatorio_metrics': [
+        ['leads', 'Negócios iniciados'],
+        ['cc1_realizada', 'CC1 realizada'],
+        ['cc1_futura', 'CC1 a acontecer'],
+        ['fpq_realizada', 'FPQ recebida'],
+        ['cc2_realizada', 'CC2 realizada'],
+        ['cc2_futura', 'CC2 a acontecer'],
+        ['cc3_realizada', 'CC3 realizada'],
+        ['cc3_futura', 'CC3 a acontecer'],
+        ['contrato_enviado', 'Contrato enviado'],
+        ['contratos', 'Contratos fechados'],
+        ['contratos_franquia', 'Contratos Franquia (c/ valor)'],
+        ['contratos_partner', 'Contratos Partner (grátis)'],
+        ['no_show', 'No-show'],
+    ],
+    # "Geral" (Visão Geral, topo do painel unificado) — funil consolidado e
+    # Relatório por closer somando Inbound+Rebarba+Outbound+Fenalaw juntos.
+    'consolidado_geral': consolidado_geral,
+    'closers_geral': closers_geral,
+    'relatorio_hint_geral': '— soma Inbound, Rebarba, Outbound e Fenalaw juntos, por closer',
+    'relatorio_metrics_geral': [
         ['leads', 'Negócios iniciados'],
         ['cc1_realizada', 'CC1 realizada'],
         ['cc1_futura', 'CC1 a acontecer'],

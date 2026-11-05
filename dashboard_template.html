@@ -466,6 +466,42 @@ function geralBlockHtml() {
     </div>
   </div>
 
+  <div class="card">
+    <h2>Consolidado do time <span class="hint">— funil Leads iniciados → Leads qualificados → Agendado → Realizado → FPQ → CC2 → CC3 → Contrato enviado → Fechado, somando Inbound, Rebarba, Outbound e Fenalaw</span></h2>
+    <div id="funnel-consolidado-geral" class="funnel"></div>
+  </div>
+
+  <div class="card">
+    <h2>Relatório por closer <span class="hint">— soma Inbound, Rebarba, Outbound e Fenalaw juntos, por closer</span></h2>
+    <div class="relatorio-toolbar">
+      <div class="relatorio-tabs" id="relatorio-tabs-global-geral">
+        <button class="rtab" data-period="diario">Diário</button>
+        <button class="rtab" data-period="semanal">Semanal</button>
+        <button class="rtab active" data-period="mes">Mês</button>
+      </div>
+      <div class="relatorio-sort">
+        <label for="relatorio-data-geral">Ver o dia</label>
+        <input type="date" id="relatorio-data-geral">
+        <button id="relatorio-data-limpar-geral" class="rtab" title="Voltar pra lista de dias">Limpar</button>
+      </div>
+      <div class="relatorio-sort">
+        <label for="relatorio-sort-key-geral">Ordenar por</label>
+        <select id="relatorio-sort-key-geral"></select>
+        <button id="relatorio-sort-dir-geral" class="rtab" data-dir="desc" title="Ordem">↓ maior → menor</button>
+      </div>
+      <div class="relatorio-sort">
+        <button id="relatorio-export-geral" class="rtab" title="Baixa em CSV exatamente o que está sendo exibido agora (período e dia selecionados)">⬇ Exportar CSV</button>
+      </div>
+    </div>
+    <div id="relatorio-closers-geral"></div>
+    <div class="relatorio-card relatorio-team">
+      <div class="relatorio-head">
+        <div class="name">Total da equipe</div>
+      </div>
+      <div class="relatorio-table-wrap" id="relatorio-table-team-geral"></div>
+    </div>
+  </div>
+
   <div class="card" id="card-previsao-geral">
     <h2>Previsão <span class="hint">— a mesma planilha de previsão, com negócios de todos os funis juntos; "Venda/Caixa realizado" aqui só soma os negócios desta lista que fecharam — pro total real de fechamentos do mês, veja o Placar do mês acima</span></h2>
     <div style="overflow-x:auto">
@@ -1183,449 +1219,15 @@ function renderPrevisaoTable(D, sufixo) {
     previsaoTotalPossivelRowHtml(D.previsao)
   ) : '';
 }
-function montarFunil(D, sufixo, titulo) {
-document.getElementById('perdidos-hint-' + sufixo).textContent = D.perdidos_hint;
-document.getElementById('relatorio-hint-' + sufixo).textContent = D.relatorio_hint;
-if (!D.tem_meta) {
-  // Só "Metas do mês" precisa de um número de meta (barra de progresso). O
-  // "Ritmo por indicador" continua aparecendo sem meta: mostra o realizado
-  // acumulado de cada indicador, só sem a linha "ideal" (pedido do time,
-  // 25/09/2026, pro painel de Outbound).
-  const elMetas = document.getElementById('card-metas-' + sufixo);
-  if (elMetas) elMetas.style.display = 'none';
-  const hintRitmo = document.querySelector('#card-ritmo-' + sufixo + ' h2 .hint');
-  if (hintRitmo) hintRitmo.textContent = '— acumulado no mês (sem meta definida nesta página, então sem linha de ritmo ideal)';
-}
-renderScoreboard(D.scoreboard, sufixo, false);
-
-// ===== Escopo do Placar/Metas e lista de negócios fechados (16/10/2026) =====
-if (D.placar_hint) document.getElementById('placar-hint-' + sufixo).textContent = D.placar_hint;
-if (D.metas_hint) document.getElementById('metas-hint-' + sufixo).textContent = D.metas_hint;
-if (Array.isArray(D.ganhos)) {
-  const tipoTxt = t => t === 'franquia' ? 'Franquia' : (t === 'partner' ? 'Partner' : 'Sem produto');
-  const funilTxt = f => f ? f.charAt(0) + f.slice(1).toLowerCase() : '—';
-  document.querySelector('#ganhos-table-' + sufixo + ' tbody').innerHTML = D.ganhos.length ? D.ganhos.map(g => `
-    <tr>
-      <td>${fmtDate((g.won_time || '').slice(0, 10))}</td>
-      <td>${g.pessoa_nome || g.titulo || '—'}</td>
-      <td>${g.closer_nome || '—'}</td>
-      <td>${funilTxt(g.funil)}</td>
-      <td>${tipoTxt(g.tipo_contrato)}</td>
-      <td>${fmtMoney(g.valor)}</td>
-      <td>${fmtMoney(g.caixa)}</td>
-      <td>${g.deal_link ? `<a href="${g.deal_link}" target="_blank" rel="noopener" style="color:var(--accent)">ver</a>` : ''}</td>
-    </tr>`).join('') : '<tr><td colspan="8" style="color:var(--text-dim)">Nenhum negócio fechado no período.</td></tr>';
-  document.getElementById('card-ganhos-' + sufixo).style.display = '';
-}
-// ===== Metas do mês (leads / CC1 / contratos) =====
-function setStatus(elId, key) {
-  const p = D.pace[key];
-  const el = document.getElementById(elId);
-  if (!p.meta) { el.textContent = 'Estimando meta...'; el.className = 'meta-status'; return; }
-  const idealHoje = Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0);
-  const realHoje = cumulativeFromDaily(p.daily)[MONTH_DATES.indexOf(TODAY_ISO)] ?? 0;
-  const diff = realHoje - idealHoje;
-  const diffTxt = Math.abs(diff) < 0.5
-    ? 'no ritmo'
-    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`);
-  el.innerHTML = `Hoje deveria estar em <b>${idealHoje}</b> · está em <b>${realHoje}</b> <span class="diff-tag">(${diffTxt})</span>`;
-  el.className = 'meta-status ' + (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
-}
-// Progresso/ritmo/status são conceitos de META DO MÊS (acumulado, dias úteis
-// já passados) — não fazem sentido recalculados pra 1 dia só. Em dia
-// filtrado, os 3 números viram a contagem daquele dia (o "/ meta" continua
-// mostrando o alvo do mês inteiro, só de referência) e o resto (barra,
-// ritmo, "abaixo/acima do ritmo") some — não tem como comparar 1 dia com uma
-// meta pensada pro mês inteiro sem inventar um número (pedido do time,
-// 16/09/2026: "todas as informações... independente do período").
-function renderMetas(diaMode, dia) {
-  document.getElementById('meta-leads-atual-' + sufixo).textContent = diaMode ? dia.leads : D.consolidado.leads;
-  document.getElementById('meta-leads-total-' + sufixo).textContent = D.meta_leads ?? '—';
-  const pctLeads = (!diaMode && D.meta_leads) ? Math.min(100, 100 * D.consolidado.leads / D.meta_leads) : 0;
-  document.getElementById('meta-leads-fill-' + sufixo).style.width = pctLeads + '%';
-  document.getElementById('meta-leads-pace-' + sufixo).textContent = diaMode ? ''
-    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-
-  document.getElementById('meta-cc1-atual-' + sufixo).textContent = diaMode ? dia.cc1_realizada : D.consolidado.cc1_realizada;
-  document.getElementById('meta-cc1-total-' + sufixo).textContent = D.pace.cc1.meta ?? '—';
-  const pctCC1 = (!diaMode && D.pace.cc1.meta) ? Math.min(100, 100 * D.consolidado.cc1_realizada / D.pace.cc1.meta) : 0;
-  document.getElementById('meta-cc1-fill-' + sufixo).style.width = pctCC1 + '%';
-  document.getElementById('meta-cc1-pace-' + sufixo).textContent = diaMode ? ''
-    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-  document.getElementById('meta-cc1-futura-' + sufixo).innerHTML = diaMode ? '' : `<b>${D.consolidado.cc1_futura}</b> para acontecer`;
-
-  document.getElementById('meta-atual-' + sufixo).textContent = diaMode ? dia.contratos : D.consolidado.contratos;
-  document.getElementById('meta-total-' + sufixo).textContent = D.meta_contratos;
-  const pctMeta = (!diaMode && D.meta_contratos) ? Math.min(100, 100 * D.consolidado.contratos / D.meta_contratos) : 0;
-  document.getElementById('meta-fill-' + sufixo).style.width = pctMeta + '%';
-  document.getElementById('meta-pace-' + sufixo).textContent = diaMode ? ''
-    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
-
-  if (diaMode) {
-    ['meta-leads-status', 'meta-cc1-status', 'meta-contratos-status'].forEach(id => {
-      const el = document.getElementById(id + '-' + sufixo);
-      el.textContent = '';
-      el.className = 'meta-status';
-    });
-  } else {
-    setStatus('meta-leads-status-' + sufixo, 'leads');
-    setStatus('meta-cc1-status-' + sufixo, 'cc1');
-    setStatus('meta-contratos-status-' + sufixo, 'contratos');
-  }
-}
-renderMetas(false);
-document.getElementById('pace-grid-' + sufixo).innerHTML = Object.keys(D.pace).map(key => {
-  const color = PACE_COLORS[key] || '#d5ae77';
-  const p = D.pace[key];
-  const realHoje = cumulativeFromDaily(p.daily)[TODAY_INDEX] ?? 0;
-  const idealHoje = p.meta ? Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0) : null;
-  const diff = idealHoje !== null ? realHoje - idealHoje : null;
-  const diffTxt = diff === null ? null : (Math.abs(diff) < 0.5
-    ? 'no ritmo'
-    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`));
-  const diffCls = diff === null ? '' : (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
-  return `
-  <div class="pace-card">
-    <div class="pace-head">
-      <div class="pace-title">${p.label}${(p.estimado && p.meta) ? '<span class="pace-tag">estimado</span>' : ''}</div>
-      <div class="pace-nums"><b>${realHoje}</b> ${p.meta ? '/ ' + p.meta : ''}</div>
-    </div>
-    <div class="pace-legend">
-      <span><i class="sw" style="border-top-color:${color}"></i>Realizado hoje <b>${realHoje}</b></span>
-      ${idealHoje !== null ? `<span><i class="sw dash"></i>Ideal hoje <b>${idealHoje}</b></span>` : ''}
-      ${diffTxt !== null ? `<span class="diff-tag ${diffCls}">${diffTxt}</span>` : ''}
-    </div>
-    <div class="pace-chart"><canvas id="pace-canvas-${key}-${sufixo}"></canvas></div>
-  </div>
-`;
-}).join('') + `
-  <div class="pace-card">
-    <div class="pace-head">
-      <div class="pace-title">Leads x Perdidos x Reuniões realizadas</div>
-    </div>
-    <div class="pace-legend">
-      <span><i class="sw" style="border-top-color:#3b82f6"></i>Leads gerados</span>
-      <span><i class="sw" style="border-top-color:#ef4444"></i>Leads perdidos</span>
-      <span><i class="sw" style="border-top-color:#22c55e"></i>Reuniões realizadas</span>
-    </div>
-    <div class="pace-chart"><canvas id="pace-canvas-comparativo-${sufixo}"></canvas></div>
-  </div>
-`;
-
-Object.keys(D.pace).forEach(key => {
-  const p = D.pace[key];
-  const color = PACE_COLORS[key] || '#d5ae77';
-  const real = cumulativeFromDaily(p.daily);
-  const ideal = p.meta ? MONTH_DATES.map(iso => p.ideal_cumulative[iso] ?? null) : [];
-  const datasets = [
-    { label: 'Realizado', data: real, borderColor: color, backgroundColor: color + '33', tension: .3, pointRadius: 0, fill: true },
-  ];
-  if (p.meta) {
-    datasets.push({ label: 'Ideal', data: ideal, borderColor: '#a8a29b', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
-  }
-  paceCharts.push(new Chart(document.getElementById(`pace-canvas-${key}-${sufixo}`), {
-    type: 'line',
-    data: { labels: paceLabels, datasets },
-    plugins: [todayLinePlugin],
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 16, bottom: 4 } },
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { ticks: { color: '#a8a29b', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
-        y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
-      }
-    }
-  }));
-});
-
-// Comparativo Leads x Perdidos x Reuniões realizadas (mesmo gráfico, 3 linhas
-// cumulativas, sem "ideal" — é comparação entre elas, não vs. meta) — pedido
-// do time (18/09/2026). Perdidos usa D.perdidos.detalhe (data + motivo por
-// negócio) porque não existe como "daily" pronto igual leads/cc1 — agrupa
-// aqui na hora.
-function diarioDePerdidos() {
-  const out = {};
-  (D.perdidos.detalhe || []).forEach(r => {
-    if (!r.data) return;
-    out[r.data] = (out[r.data] || 0) + 1;
-  });
-  return out;
-}
-paceCharts.push(new Chart(document.getElementById('pace-canvas-comparativo-' + sufixo), {
-  type: 'line',
-  data: {
-    labels: paceLabels,
-    datasets: [
-      { label: 'Leads gerados', data: cumulativeFromDaily(D.pace.leads.daily), borderColor: '#3b82f6', backgroundColor: '#3b82f633', tension: .3, pointRadius: 0, fill: true },
-      { label: 'Leads perdidos', data: cumulativeFromDaily(diarioDePerdidos()), borderColor: '#ef4444', backgroundColor: '#ef444433', tension: .3, pointRadius: 0, fill: true },
-      { label: 'Reuniões realizadas', data: cumulativeFromDaily(D.pace.cc1.daily), borderColor: '#22c55e', backgroundColor: '#22c55e33', tension: .3, pointRadius: 0, fill: true },
-    ],
-  },
-  plugins: [comparativoLinePlugin],
-  options: {
-    responsive: true, maintainAspectRatio: false,
-    layout: { padding: { top: 16, bottom: 4 } },
-    plugins: { legend: { display: false } },
-    scales: {
-      x: { ticks: { color: '#a8a29b', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
-      y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
-    }
-  }
-}));
-
-// ===== Funil (consolidado e por closer) =====
-function convPct(val, base) {
-  return base ? Math.round(1000 * val / base) / 10 : null;
-}
-function funnelStages(m) {
-  // "Leads qualificados"/"Agendado"/"Realizado" só existem no consolidado do
-  // Inbound (m.leads_qualificados) — no comparativo por closer o funil continua
-  // começando em "CC1 realizada" (a qualificação é feita pelo time de
-  // qualificação, não por um closer específico).
-  const pre = m.leads_qualificados === undefined ? [
-    ['CC1 realizada', m.cc1_realizada, undefined],
-  ] : [
-    ['Leads iniciados', m.leads, undefined],
-    ['Leads qualificados', m.leads_qualificados, convPct(m.leads_qualificados, m.leads)],
-    ['Agendado', m.cc1_agendado, convPct(m.cc1_agendado, m.leads_qualificados)],
-    ['Realizado', m.cc1_realizada, convPct(m.cc1_realizada, m.cc1_agendado)],
-  ];
-  return [
-    ...pre,
-    ['FPQ recebida', m.fpq_realizada, m.conversao.cc1_para_fpq],
-    ['CC2 realizada', m.cc2_realizada, m.conversao.fpq_para_cc2],
-    ['CC3 realizada', m.cc3_realizada, m.conversao.cc2_para_cc3],
-    ['Contrato enviado', m.contrato_enviado, undefined],
-    ['Fechados (Ganho)', m.contratos, undefined],
-    // Franquia (tem valor) x Partner (de graça) dentro do próprio funil — só
-    // quando o objeto trouxer essa quebra (consolidado e comparativo por
-    // closer trazem; outros funis podem não trazer). Pedido do time
-    // (28/09/2026): ver de cara quanto do "Fechados" é Franquia x Partner.
-    ...(m.contratos_franquia === undefined ? [] : [
-      ['Fechados Franquia', m.contratos_franquia, undefined],
-      ['Fechados Partner', m.contratos_partner, undefined],
-    ]),
-  ];
-}
-function renderFunnel(elId, m) {
-  const stages = funnelStages(m);
-  const max = Math.max(1, ...stages.map(s => s[1]));
-  const el = document.getElementById(elId);
-  el.innerHTML = stages.map(([label, val, conv]) => `
-    <div class="funnel-row">
-      <div class="funnel-label">${label}</div>
-      <div class="funnel-track"><div class="funnel-fill" style="width:${100 * val / max}%"></div></div>
-      <div class="funnel-val">${val}</div>
-      <div class="funnel-conv">${conv === undefined ? '' : 'conv. ' + pctStr(conv)}</div>
-    </div>
-  `).join('');
-}
-renderFunnel('funnel-consolidado-' + sufixo, D.consolidado);
-if (D.consolidado.leads_qualificados !== undefined) {
-  document.getElementById('consolidado-hint-' + sufixo).textContent =
-    '— funil Leads iniciados → Leads qualificados → Agendado → Realizado → FPQ → CC2 → CC3 → Contrato enviado → Fechado';
-}
-
-// ===== Perdidos =====
-function renderPerdidosCard(p) {
-  document.getElementById('lost-total-' + sufixo).textContent = p.total;
-  document.getElementById('lost-qualificadora-' + sufixo).textContent = p.pela_qualificadora;
-  document.getElementById('lost-repasse-' + sufixo).textContent = p.apos_repasse;
-  function renderLostBlock(elId, field, semDadosTxt) {
-    const itens = p.por_motivo
-      .filter(m => m[field] > 0)
-      .sort((a, b) => b[field] - a[field]);
-    const max = Math.max(1, ...itens.map(m => m[field]));
-    document.getElementById(elId).innerHTML = itens.length
-      ? itens.map(m => `
-          <div class="lost-reason-row">
-            <div class="l">${m.motivo}</div>
-            <div class="lost-reason-track"><div class="lost-reason-fill" style="width:${100 * m[field] / max}%"></div></div>
-            <div class="v">${m[field]}</div>
-          </div>
-        `).join('')
-      : `<div style="color:var(--text-dim);font-size:13px">${semDadosTxt}</div>`;
-  }
-  renderLostBlock('lost-reasons-qualificadora-' + sufixo, 'qualificadora', 'Nenhum perdido nesse período.');
-  renderLostBlock('lost-reasons-expansao-' + sufixo, 'expansao', 'Nenhum perdido nesse período.');
-}
-renderPerdidosCard(D.perdidos);
-
-// ===== Comparativo entre closers (funil individual, mesma linguagem visual do consolidado) =====
-document.getElementById('compare-grid-' + sufixo).innerHTML = D.closers.map((c, i) => `
-  <div class="compare-card">
-    <div class="name">${c.nome}</div>
-    <div class="funnel" id="compare-funnel-${i}-${sufixo}"></div>
-    <div class="compare-kpis">
-      <div class="m"><div class="v">${c.contratos}</div><div class="l">Contratos</div></div>
-      <div class="m"><div class="v">${c.contratos_franquia}</div><div class="l">Ganho Franquia</div></div>
-      <div class="m"><div class="v">${c.contratos_partner}</div><div class="l">Ganho Partner</div></div>
-    </div>
-  </div>
-`).join('');
-D.closers.forEach((c, i) => renderFunnel(`compare-funnel-${i}-${sufixo}`, c));
-
-// ===== Ranking campanhas / criativos =====
-function rkRow(i) {
-  return `
-    <div class="rk-row">
-      <div class="rk-name" title="${i.nome}">${i.nome}</div>
-      <div class="rk-nums">${i.cc1} CC1 · ${i.leads} leads${i.conversao !== null ? ' · conv. ' + i.conversao + '%' : ''}</div>
-    </div>`;
-}
-function rkList(items, cls, title) {
-  return `<div class="ranking-list ${cls}"><div class="rk-title">${title}</div>${
-    items.length ? items.map(rkRow).join('') : '<div style="color:var(--text-dim);font-size:12px">Sem dados suficientes</div>'
-  }</div>`;
-}
-function renderRankingCard(ranking) {
-  document.getElementById('ranking-campanhas-' + sufixo).innerHTML =
-    rkList(ranking.campanhas.melhores, 'best', 'Melhores') + rkList(ranking.campanhas.piores, 'worst', 'Piores');
-  document.getElementById('ranking-criativos-' + sufixo).innerHTML =
-    rkList(ranking.criativos.melhores, 'best', 'Melhores') + rkList(ranking.criativos.piores, 'worst', 'Piores');
-}
-renderRankingCard(D.ranking);
-
-// ===== Filtro por dia — Placar, Consolidado do time, Perdidos e Ranking
-// passam a refletir o dia escolhido em "Ver o dia" (Relatório por closer),
-// não só a própria tabela de Relatório. Pedido do time (13/09/2026): "quando
-// ajustar a data no relatório, todos os dados sejam vistos conforme aquele
-// período". Mapa de calor / FPQs recebidas / Metas do mês / Ritmo / Previsão
-// continuam de mês inteiro — Metas e Ritmo são projeções do MÊS por
-// natureza (não fazem sentido pra 1 dia); Previsão é uma lista viva de
-// negócios em aberto, não um evento datado; Mapa de calor e FPQs recebidas
-// ficam de fora por ora (podem entrar depois se fizer falta). =====
-const DIA_METRICAS = ['leads', 'cc1_realizada', 'fpq_realizada', 'cc2_realizada', 'cc3_realizada', 'contrato_enviado', 'contratos', 'contratos_franquia', 'contratos_partner', 'venda', 'caixa'];
-function diaPct(a, b) { return b ? Math.round(1000 * a / b) / 10 : null; }
-function diaSomaMetricas(iso) {
-  const out = {};
-  DIA_METRICAS.forEach(k => { out[k] = 0; });
-  D.closers.forEach(c => {
-    DIA_METRICAS.forEach(k => { out[k] += (c.diario[k] || {})[iso] || 0; });
-  });
-  // renderFunnel()/funnelStages() espera um objeto no mesmo formato de
-  // D.consolidado (com .conversao) — sem isso quebra lendo m.conversao.* undefined.
-  out.conversao = {
-    cc1_para_fpq: diaPct(out.fpq_realizada, out.cc1_realizada),
-    fpq_para_cc2: diaPct(out.cc2_realizada, out.fpq_realizada),
-    cc2_para_cc3: diaPct(out.cc3_realizada, out.cc2_realizada),
-  };
-  return out;
-}
-function diaPerdidos(iso) {
-  const lista = (D.perdidos.detalhe || []).filter(x => x.data === iso);
-  const qualificadora = lista.filter(x => x.pela_qualificadora).length;
-  const contar = arr => {
-    const m = {};
-    arr.forEach(x => { const k = x.motivo || 'Não informado'; m[k] = (m[k] || 0) + 1; });
-    return m;
-  };
-  const mQ = contar(lista.filter(x => x.pela_qualificadora));
-  const mE = contar(lista.filter(x => !x.pela_qualificadora));
-  const motivos = [...new Set(lista.map(x => x.motivo || 'Não informado'))];
-  return {
-    total: lista.length, pela_qualificadora: qualificadora, apos_repasse: lista.length - qualificadora,
-    por_motivo: motivos.map(m => ({ motivo: m, qualificadora: mQ[m] || 0, expansao: mE[m] || 0 })),
-  };
-}
-function diaRankingUtm(iso, col) {
-  const leads = (D.ranking.detalhe_leads || []).filter(x => x.data === iso);
-  const cc1 = (D.ranking.detalhe_cc1 || []).filter(x => x.data === iso);
-  const leadsCount = {}, cc1Count = {};
-  leads.forEach(x => { const v = x[col]; if (v) leadsCount[v] = (leadsCount[v] || 0) + 1; });
-  cc1.forEach(x => { const v = x[col]; if (v) cc1Count[v] = (cc1Count[v] || 0) + 1; });
-  const nomes = new Set([...Object.keys(leadsCount), ...Object.keys(cc1Count)]);
-  const itens = [...nomes].map(nome => {
-    const leadsN = leadsCount[nome] || 0, cc1N = cc1Count[nome] || 0;
-    return { nome, leads: leadsN, cc1: cc1N, conversao: leadsN ? Math.round(1000 * cc1N / leadsN) / 10 : null };
-  });
-  const melhores = itens.filter(i => i.cc1 > 0).sort((a, b) => (b.cc1 - a.cc1) || ((b.conversao || 0) - (a.conversao || 0))).slice(0, 5);
-  let piores = itens.filter(i => i.leads >= 3);
-  if (!piores.length) piores = itens.filter(i => i.leads >= 1);
-  piores = piores.sort((a, b) => ((a.conversao ?? 999) - (b.conversao ?? 999)) || (a.cc1 - b.cc1)).slice(0, 5);
-  return { melhores, piores };
-}
-function marcarBadgesDia(txt) {
-  ['dia-badge-placar', 'dia-badge-consolidado', 'dia-badge-perdidos', 'dia-badge-ranking',
-   'dia-badge-metas', 'dia-badge-agendadores', 'dia-badge-heatmap', 'dia-badge-fpq'].forEach(id => {
-    const el = document.getElementById(id + '-' + sufixo);
-    if (el) el.textContent = txt || '';
-  });
-}
-function aplicarFiltroDia(iso) {
-  const dia = diaSomaMetricas(iso);
-  renderScoreboard({
-    contratos_fechados: dia.contratos,
-    contratos_fechados_franquia: dia.contratos_franquia,
-    contratos_fechados_partner: dia.contratos_partner,
-    venda_realizada_total: dia.venda,
-    caixa_realizado_total: dia.caixa,
-  }, sufixo, true);
-  renderFunnel('funnel-consolidado-' + sufixo, dia);
-  renderPerdidosCard(diaPerdidos(iso));
-  renderRankingCard({ campanhas: diaRankingUtm(iso, 'utm_campanha'), criativos: diaRankingUtm(iso, 'utm_criativo') });
-  renderMetas(true, dia);
-  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores.map(a => agendadorDiaMetricas(a, iso)), true);
-  renderHeatmap(heatmapMatrizDia(iso));
-  fpqDiaFiltro = iso;
-  fpqRenderTable(fpqCloserFilter.value);
-  marcarBadgesDia('— dia ' + fmtDate(iso));
-}
-function limparFiltroDia() {
-  renderScoreboard(D.scoreboard, sufixo, false);
-  renderFunnel('funnel-consolidado-' + sufixo, D.consolidado);
-  renderPerdidosCard(D.perdidos);
-  renderRankingCard(D.ranking);
-  renderMetas(false);
-  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores, false);
-  renderHeatmap(D.heatmap_cc1.matriz);
-  fpqDiaFiltro = null;
-  fpqRenderTable(fpqCloserFilter.value);
-  marcarBadgesDia('');
-}
-
-// ===== Mapa de calor — horários de CC1 (dias no topo, horas na lateral, estilo agenda) =====
-function renderHeatmap(matriz) {
-  const { dias, horas } = D.heatmap_cc1;
-  const max = Math.max(1, ...matriz.flat());
-  const cols = dias.length;
-  const cellsHtml = [];
-  cellsHtml.push(`<div></div>`);
-  dias.forEach(dia => cellsHtml.push(`<div class="heatmap-day">${dia}</div>`));
-  horas.forEach((h, hIdx) => {
-    const horaLbl = String(h).padStart(2, '0') + 'h';
-    cellsHtml.push(`<div class="heatmap-hour">${horaLbl}</div>`);
-    dias.forEach((dia, i) => {
-      const v = matriz[i][hIdx];
-      const alpha = v === 0 ? 0 : 0.15 + 0.75 * (v / max);
-      const style = v === 0
-        ? `background: var(--card-hi);`
-        : `background: rgba(213,174,119,${alpha.toFixed(2)});`;
-      cellsHtml.push(`<div class="heatmap-cell${v === 0 ? ' empty' : ''}" style="${style}" title="${dia} ${horaLbl}">${v || ''}</div>`);
-    });
-  });
-  document.getElementById('heatmap-cc1-' + sufixo).innerHTML = `
-    <div class="heatmap-wrap">
-      <div class="heatmap-grid" style="grid-template-columns: 60px repeat(${cols}, 1fr);">
-        ${cellsHtml.join('')}
-      </div>
-    </div>`;
-}
-renderHeatmap(D.heatmap_cc1.matriz);
-function heatmapMatrizDia(iso) {
-  const { dias, horas, detalhe } = D.heatmap_cc1;
-  const m = dias.map(() => horas.map(() => 0));
-  const wd = (new Date(iso + 'T00:00:00').getDay() + 6) % 7; // 0 = segunda
-  if (wd > 4) return m; // mapa só cobre seg-sex
-  (detalhe || []).filter(x => x.data === iso).forEach(x => {
-    const hIdx = horas.indexOf(x.hora);
-    if (hIdx >= 0) m[wd][hIdx]++;
-  });
-  return m;
-}
-
-// ===== Relatório por closer (diário / semanal / mês) =====
+// ===== Relatório por closer (diário / semanal / mês) — função de página
+// (mesmo motivo do bloco previsão/scoreboard: usada por cada funil E pelo
+// card "Relatório por closer" consolidado no topo, com D = {closers:
+// closers_geral, consolidado: consolidado_geral, relatorio_metrics:
+// relatorio_metrics_geral, ...} — ver build_dashboard.py). aplicarFiltroDia/
+// limparFiltroDia são opcionais (só existem de verdade por funil, sincronizam
+// Placar/Consolidado/Perdidos/Ranking com o dia escolhido aqui) — a versão
+// "geral" não tem isso ainda, então usa no-op por padrão.
+function initRelatorioPorCloser(D, sufixo, titulo, aplicarFiltroDia = () => {}, limparFiltroDia = () => {}) {
 const RELATORIO_METRICS = D.relatorio_metrics;
 
 function relatorioMondayOf(iso) {
@@ -1843,6 +1445,453 @@ document.getElementById('relatorio-export-' + sufixo).addEventListener('click', 
   a.remove();
   URL.revokeObjectURL(url);
 });
+}
+
+// ===== Funil (consolidado e por closer) — função de página, mesmo motivo de
+// sempre (usada por cada funil E pelo "Consolidado do time" geral no topo) =====
+function convPct(val, base) {
+  return base ? Math.round(1000 * val / base) / 10 : null;
+}
+function funnelStages(m) {
+  // "Leads qualificados"/"Agendado"/"Realizado" só existem no consolidado do
+  // Inbound (m.leads_qualificados) — no comparativo por closer o funil continua
+  // começando em "CC1 realizada" (a qualificação é feita pelo time de
+  // qualificação, não por um closer específico).
+  const pre = m.leads_qualificados === undefined ? [
+    ['CC1 realizada', m.cc1_realizada, undefined],
+  ] : [
+    ['Leads iniciados', m.leads, undefined],
+    ['Leads qualificados', m.leads_qualificados, convPct(m.leads_qualificados, m.leads)],
+    ['Agendado', m.cc1_agendado, convPct(m.cc1_agendado, m.leads_qualificados)],
+    ['Realizado', m.cc1_realizada, convPct(m.cc1_realizada, m.cc1_agendado)],
+  ];
+  return [
+    ...pre,
+    ['FPQ recebida', m.fpq_realizada, m.conversao.cc1_para_fpq],
+    ['CC2 realizada', m.cc2_realizada, m.conversao.fpq_para_cc2],
+    ['CC3 realizada', m.cc3_realizada, m.conversao.cc2_para_cc3],
+    ['Contrato enviado', m.contrato_enviado, undefined],
+    ['Fechados (Ganho)', m.contratos, undefined],
+    // Franquia (tem valor) x Partner (de graça) dentro do próprio funil — só
+    // quando o objeto trouxer essa quebra (consolidado e comparativo por
+    // closer trazem; outros funis podem não trazer). Pedido do time
+    // (28/09/2026): ver de cara quanto do "Fechados" é Franquia x Partner.
+    ...(m.contratos_franquia === undefined ? [] : [
+      ['Fechados Franquia', m.contratos_franquia, undefined],
+      ['Fechados Partner', m.contratos_partner, undefined],
+    ]),
+  ];
+}
+function renderFunnel(elId, m) {
+  const stages = funnelStages(m);
+  const max = Math.max(1, ...stages.map(s => s[1]));
+  const el = document.getElementById(elId);
+  el.innerHTML = stages.map(([label, val, conv]) => `
+    <div class="funnel-row">
+      <div class="funnel-label">${label}</div>
+      <div class="funnel-track"><div class="funnel-fill" style="width:${100 * val / max}%"></div></div>
+      <div class="funnel-val">${val}</div>
+      <div class="funnel-conv">${conv === undefined ? '' : 'conv. ' + pctStr(conv)}</div>
+    </div>
+  `).join('');
+}
+
+function montarFunil(D, sufixo, titulo) {
+document.getElementById('perdidos-hint-' + sufixo).textContent = D.perdidos_hint;
+document.getElementById('relatorio-hint-' + sufixo).textContent = D.relatorio_hint;
+if (!D.tem_meta) {
+  // Só "Metas do mês" precisa de um número de meta (barra de progresso). O
+  // "Ritmo por indicador" continua aparecendo sem meta: mostra o realizado
+  // acumulado de cada indicador, só sem a linha "ideal" (pedido do time,
+  // 25/09/2026, pro painel de Outbound).
+  const elMetas = document.getElementById('card-metas-' + sufixo);
+  if (elMetas) elMetas.style.display = 'none';
+  const hintRitmo = document.querySelector('#card-ritmo-' + sufixo + ' h2 .hint');
+  if (hintRitmo) hintRitmo.textContent = '— acumulado no mês (sem meta definida nesta página, então sem linha de ritmo ideal)';
+}
+renderScoreboard(D.scoreboard, sufixo, false);
+
+// ===== Escopo do Placar/Metas e lista de negócios fechados (16/10/2026) =====
+if (D.placar_hint) document.getElementById('placar-hint-' + sufixo).textContent = D.placar_hint;
+if (D.metas_hint) document.getElementById('metas-hint-' + sufixo).textContent = D.metas_hint;
+if (Array.isArray(D.ganhos)) {
+  const tipoTxt = t => t === 'franquia' ? 'Franquia' : (t === 'partner' ? 'Partner' : 'Sem produto');
+  const funilTxt = f => f ? f.charAt(0) + f.slice(1).toLowerCase() : '—';
+  document.querySelector('#ganhos-table-' + sufixo + ' tbody').innerHTML = D.ganhos.length ? D.ganhos.map(g => `
+    <tr>
+      <td>${fmtDate((g.won_time || '').slice(0, 10))}</td>
+      <td>${g.pessoa_nome || g.titulo || '—'}</td>
+      <td>${g.closer_nome || '—'}</td>
+      <td>${funilTxt(g.funil)}</td>
+      <td>${tipoTxt(g.tipo_contrato)}</td>
+      <td>${fmtMoney(g.valor)}</td>
+      <td>${fmtMoney(g.caixa)}</td>
+      <td>${g.deal_link ? `<a href="${g.deal_link}" target="_blank" rel="noopener" style="color:var(--accent)">ver</a>` : ''}</td>
+    </tr>`).join('') : '<tr><td colspan="8" style="color:var(--text-dim)">Nenhum negócio fechado no período.</td></tr>';
+  document.getElementById('card-ganhos-' + sufixo).style.display = '';
+}
+// ===== Metas do mês (leads / CC1 / contratos) =====
+function setStatus(elId, key) {
+  const p = D.pace[key];
+  const el = document.getElementById(elId);
+  if (!p.meta) { el.textContent = 'Estimando meta...'; el.className = 'meta-status'; return; }
+  const idealHoje = Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0);
+  const realHoje = cumulativeFromDaily(p.daily)[MONTH_DATES.indexOf(TODAY_ISO)] ?? 0;
+  const diff = realHoje - idealHoje;
+  const diffTxt = Math.abs(diff) < 0.5
+    ? 'no ritmo'
+    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`);
+  el.innerHTML = `Hoje deveria estar em <b>${idealHoje}</b> · está em <b>${realHoje}</b> <span class="diff-tag">(${diffTxt})</span>`;
+  el.className = 'meta-status ' + (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
+}
+// Progresso/ritmo/status são conceitos de META DO MÊS (acumulado, dias úteis
+// já passados) — não fazem sentido recalculados pra 1 dia só. Em dia
+// filtrado, os 3 números viram a contagem daquele dia (o "/ meta" continua
+// mostrando o alvo do mês inteiro, só de referência) e o resto (barra,
+// ritmo, "abaixo/acima do ritmo") some — não tem como comparar 1 dia com uma
+// meta pensada pro mês inteiro sem inventar um número (pedido do time,
+// 16/09/2026: "todas as informações... independente do período").
+function renderMetas(diaMode, dia) {
+  document.getElementById('meta-leads-atual-' + sufixo).textContent = diaMode ? dia.leads : D.consolidado.leads;
+  document.getElementById('meta-leads-total-' + sufixo).textContent = D.meta_leads ?? '—';
+  const pctLeads = (!diaMode && D.meta_leads) ? Math.min(100, 100 * D.consolidado.leads / D.meta_leads) : 0;
+  document.getElementById('meta-leads-fill-' + sufixo).style.width = pctLeads + '%';
+  document.getElementById('meta-leads-pace-' + sufixo).textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+  document.getElementById('meta-cc1-atual-' + sufixo).textContent = diaMode ? dia.cc1_realizada : D.consolidado.cc1_realizada;
+  document.getElementById('meta-cc1-total-' + sufixo).textContent = D.pace.cc1.meta ?? '—';
+  const pctCC1 = (!diaMode && D.pace.cc1.meta) ? Math.min(100, 100 * D.consolidado.cc1_realizada / D.pace.cc1.meta) : 0;
+  document.getElementById('meta-cc1-fill-' + sufixo).style.width = pctCC1 + '%';
+  document.getElementById('meta-cc1-pace-' + sufixo).textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+  document.getElementById('meta-cc1-futura-' + sufixo).innerHTML = diaMode ? '' : `<b>${D.consolidado.cc1_futura}</b> para acontecer`;
+
+  document.getElementById('meta-atual-' + sufixo).textContent = diaMode ? dia.contratos : D.consolidado.contratos;
+  document.getElementById('meta-total-' + sufixo).textContent = D.meta_contratos;
+  const pctMeta = (!diaMode && D.meta_contratos) ? Math.min(100, 100 * D.consolidado.contratos / D.meta_contratos) : 0;
+  document.getElementById('meta-fill-' + sufixo).style.width = pctMeta + '%';
+  document.getElementById('meta-pace-' + sufixo).textContent = diaMode ? ''
+    : `${D.ritmo.dias_uteis_passados} / ${D.ritmo.dias_uteis_total} dias úteis do mês`;
+
+  if (diaMode) {
+    ['meta-leads-status', 'meta-cc1-status', 'meta-contratos-status'].forEach(id => {
+      const el = document.getElementById(id + '-' + sufixo);
+      el.textContent = '';
+      el.className = 'meta-status';
+    });
+  } else {
+    setStatus('meta-leads-status-' + sufixo, 'leads');
+    setStatus('meta-cc1-status-' + sufixo, 'cc1');
+    setStatus('meta-contratos-status-' + sufixo, 'contratos');
+  }
+}
+renderMetas(false);
+document.getElementById('pace-grid-' + sufixo).innerHTML = Object.keys(D.pace).map(key => {
+  const color = PACE_COLORS[key] || '#d5ae77';
+  const p = D.pace[key];
+  const realHoje = cumulativeFromDaily(p.daily)[TODAY_INDEX] ?? 0;
+  const idealHoje = p.meta ? Math.round(p.ideal_cumulative[TODAY_ISO] ?? 0) : null;
+  const diff = idealHoje !== null ? realHoje - idealHoje : null;
+  const diffTxt = diff === null ? null : (Math.abs(diff) < 0.5
+    ? 'no ritmo'
+    : (diff > 0 ? `${Math.round(diff)} acima do ritmo` : `${Math.round(-diff)} abaixo do ritmo`));
+  const diffCls = diff === null ? '' : (Math.abs(diff) < 0.5 ? '' : (diff > 0 ? 'ahead' : 'behind'));
+  return `
+  <div class="pace-card">
+    <div class="pace-head">
+      <div class="pace-title">${p.label}${(p.estimado && p.meta) ? '<span class="pace-tag">estimado</span>' : ''}</div>
+      <div class="pace-nums"><b>${realHoje}</b> ${p.meta ? '/ ' + p.meta : ''}</div>
+    </div>
+    <div class="pace-legend">
+      <span><i class="sw" style="border-top-color:${color}"></i>Realizado hoje <b>${realHoje}</b></span>
+      ${idealHoje !== null ? `<span><i class="sw dash"></i>Ideal hoje <b>${idealHoje}</b></span>` : ''}
+      ${diffTxt !== null ? `<span class="diff-tag ${diffCls}">${diffTxt}</span>` : ''}
+    </div>
+    <div class="pace-chart"><canvas id="pace-canvas-${key}-${sufixo}"></canvas></div>
+  </div>
+`;
+}).join('') + `
+  <div class="pace-card">
+    <div class="pace-head">
+      <div class="pace-title">Leads x Perdidos x Reuniões realizadas</div>
+    </div>
+    <div class="pace-legend">
+      <span><i class="sw" style="border-top-color:#3b82f6"></i>Leads gerados</span>
+      <span><i class="sw" style="border-top-color:#ef4444"></i>Leads perdidos</span>
+      <span><i class="sw" style="border-top-color:#22c55e"></i>Reuniões realizadas</span>
+    </div>
+    <div class="pace-chart"><canvas id="pace-canvas-comparativo-${sufixo}"></canvas></div>
+  </div>
+`;
+
+Object.keys(D.pace).forEach(key => {
+  const p = D.pace[key];
+  const color = PACE_COLORS[key] || '#d5ae77';
+  const real = cumulativeFromDaily(p.daily);
+  const ideal = p.meta ? MONTH_DATES.map(iso => p.ideal_cumulative[iso] ?? null) : [];
+  const datasets = [
+    { label: 'Realizado', data: real, borderColor: color, backgroundColor: color + '33', tension: .3, pointRadius: 0, fill: true },
+  ];
+  if (p.meta) {
+    datasets.push({ label: 'Ideal', data: ideal, borderColor: '#a8a29b', borderDash: [5, 4], pointRadius: 0, tension: 0, fill: false });
+  }
+  paceCharts.push(new Chart(document.getElementById(`pace-canvas-${key}-${sufixo}`), {
+    type: 'line',
+    data: { labels: paceLabels, datasets },
+    plugins: [todayLinePlugin],
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 16, bottom: 4 } },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { ticks: { color: '#a8a29b', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
+        y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
+      }
+    }
+  }));
+});
+
+// Comparativo Leads x Perdidos x Reuniões realizadas (mesmo gráfico, 3 linhas
+// cumulativas, sem "ideal" — é comparação entre elas, não vs. meta) — pedido
+// do time (18/09/2026). Perdidos usa D.perdidos.detalhe (data + motivo por
+// negócio) porque não existe como "daily" pronto igual leads/cc1 — agrupa
+// aqui na hora.
+function diarioDePerdidos() {
+  const out = {};
+  (D.perdidos.detalhe || []).forEach(r => {
+    if (!r.data) return;
+    out[r.data] = (out[r.data] || 0) + 1;
+  });
+  return out;
+}
+paceCharts.push(new Chart(document.getElementById('pace-canvas-comparativo-' + sufixo), {
+  type: 'line',
+  data: {
+    labels: paceLabels,
+    datasets: [
+      { label: 'Leads gerados', data: cumulativeFromDaily(D.pace.leads.daily), borderColor: '#3b82f6', backgroundColor: '#3b82f633', tension: .3, pointRadius: 0, fill: true },
+      { label: 'Leads perdidos', data: cumulativeFromDaily(diarioDePerdidos()), borderColor: '#ef4444', backgroundColor: '#ef444433', tension: .3, pointRadius: 0, fill: true },
+      { label: 'Reuniões realizadas', data: cumulativeFromDaily(D.pace.cc1.daily), borderColor: '#22c55e', backgroundColor: '#22c55e33', tension: .3, pointRadius: 0, fill: true },
+    ],
+  },
+  plugins: [comparativoLinePlugin],
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    layout: { padding: { top: 16, bottom: 4 } },
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { ticks: { color: '#a8a29b', maxTicksLimit: 6, font: { size: 10 } }, grid: { display: false } },
+      y: { beginAtZero: true, ticks: { color: '#a8a29b', precision: 0, font: { size: 10 } }, grid: { color: '#3a342e' } },
+    }
+  }
+}));
+
+renderFunnel('funnel-consolidado-' + sufixo, D.consolidado);
+if (D.consolidado.leads_qualificados !== undefined) {
+  document.getElementById('consolidado-hint-' + sufixo).textContent =
+    '— funil Leads iniciados → Leads qualificados → Agendado → Realizado → FPQ → CC2 → CC3 → Contrato enviado → Fechado';
+}
+
+// ===== Perdidos =====
+function renderPerdidosCard(p) {
+  document.getElementById('lost-total-' + sufixo).textContent = p.total;
+  document.getElementById('lost-qualificadora-' + sufixo).textContent = p.pela_qualificadora;
+  document.getElementById('lost-repasse-' + sufixo).textContent = p.apos_repasse;
+  function renderLostBlock(elId, field, semDadosTxt) {
+    const itens = p.por_motivo
+      .filter(m => m[field] > 0)
+      .sort((a, b) => b[field] - a[field]);
+    const max = Math.max(1, ...itens.map(m => m[field]));
+    document.getElementById(elId).innerHTML = itens.length
+      ? itens.map(m => `
+          <div class="lost-reason-row">
+            <div class="l">${m.motivo}</div>
+            <div class="lost-reason-track"><div class="lost-reason-fill" style="width:${100 * m[field] / max}%"></div></div>
+            <div class="v">${m[field]}</div>
+          </div>
+        `).join('')
+      : `<div style="color:var(--text-dim);font-size:13px">${semDadosTxt}</div>`;
+  }
+  renderLostBlock('lost-reasons-qualificadora-' + sufixo, 'qualificadora', 'Nenhum perdido nesse período.');
+  renderLostBlock('lost-reasons-expansao-' + sufixo, 'expansao', 'Nenhum perdido nesse período.');
+}
+renderPerdidosCard(D.perdidos);
+
+// ===== Comparativo entre closers (funil individual, mesma linguagem visual do consolidado) =====
+document.getElementById('compare-grid-' + sufixo).innerHTML = D.closers.map((c, i) => `
+  <div class="compare-card">
+    <div class="name">${c.nome}</div>
+    <div class="funnel" id="compare-funnel-${i}-${sufixo}"></div>
+    <div class="compare-kpis">
+      <div class="m"><div class="v">${c.contratos}</div><div class="l">Contratos</div></div>
+      <div class="m"><div class="v">${c.contratos_franquia}</div><div class="l">Ganho Franquia</div></div>
+      <div class="m"><div class="v">${c.contratos_partner}</div><div class="l">Ganho Partner</div></div>
+    </div>
+  </div>
+`).join('');
+D.closers.forEach((c, i) => renderFunnel(`compare-funnel-${i}-${sufixo}`, c));
+
+// ===== Ranking campanhas / criativos =====
+function rkRow(i) {
+  return `
+    <div class="rk-row">
+      <div class="rk-name" title="${i.nome}">${i.nome}</div>
+      <div class="rk-nums">${i.cc1} CC1 · ${i.leads} leads${i.conversao !== null ? ' · conv. ' + i.conversao + '%' : ''}</div>
+    </div>`;
+}
+function rkList(items, cls, title) {
+  return `<div class="ranking-list ${cls}"><div class="rk-title">${title}</div>${
+    items.length ? items.map(rkRow).join('') : '<div style="color:var(--text-dim);font-size:12px">Sem dados suficientes</div>'
+  }</div>`;
+}
+function renderRankingCard(ranking) {
+  document.getElementById('ranking-campanhas-' + sufixo).innerHTML =
+    rkList(ranking.campanhas.melhores, 'best', 'Melhores') + rkList(ranking.campanhas.piores, 'worst', 'Piores');
+  document.getElementById('ranking-criativos-' + sufixo).innerHTML =
+    rkList(ranking.criativos.melhores, 'best', 'Melhores') + rkList(ranking.criativos.piores, 'worst', 'Piores');
+}
+renderRankingCard(D.ranking);
+
+// ===== Filtro por dia — Placar, Consolidado do time, Perdidos e Ranking
+// passam a refletir o dia escolhido em "Ver o dia" (Relatório por closer),
+// não só a própria tabela de Relatório. Pedido do time (13/09/2026): "quando
+// ajustar a data no relatório, todos os dados sejam vistos conforme aquele
+// período". Mapa de calor / FPQs recebidas / Metas do mês / Ritmo / Previsão
+// continuam de mês inteiro — Metas e Ritmo são projeções do MÊS por
+// natureza (não fazem sentido pra 1 dia); Previsão é uma lista viva de
+// negócios em aberto, não um evento datado; Mapa de calor e FPQs recebidas
+// ficam de fora por ora (podem entrar depois se fizer falta). =====
+const DIA_METRICAS = ['leads', 'cc1_realizada', 'fpq_realizada', 'cc2_realizada', 'cc3_realizada', 'contrato_enviado', 'contratos', 'contratos_franquia', 'contratos_partner', 'venda', 'caixa'];
+function diaPct(a, b) { return b ? Math.round(1000 * a / b) / 10 : null; }
+function diaSomaMetricas(iso) {
+  const out = {};
+  DIA_METRICAS.forEach(k => { out[k] = 0; });
+  D.closers.forEach(c => {
+    DIA_METRICAS.forEach(k => { out[k] += (c.diario[k] || {})[iso] || 0; });
+  });
+  // renderFunnel()/funnelStages() espera um objeto no mesmo formato de
+  // D.consolidado (com .conversao) — sem isso quebra lendo m.conversao.* undefined.
+  out.conversao = {
+    cc1_para_fpq: diaPct(out.fpq_realizada, out.cc1_realizada),
+    fpq_para_cc2: diaPct(out.cc2_realizada, out.fpq_realizada),
+    cc2_para_cc3: diaPct(out.cc3_realizada, out.cc2_realizada),
+  };
+  return out;
+}
+function diaPerdidos(iso) {
+  const lista = (D.perdidos.detalhe || []).filter(x => x.data === iso);
+  const qualificadora = lista.filter(x => x.pela_qualificadora).length;
+  const contar = arr => {
+    const m = {};
+    arr.forEach(x => { const k = x.motivo || 'Não informado'; m[k] = (m[k] || 0) + 1; });
+    return m;
+  };
+  const mQ = contar(lista.filter(x => x.pela_qualificadora));
+  const mE = contar(lista.filter(x => !x.pela_qualificadora));
+  const motivos = [...new Set(lista.map(x => x.motivo || 'Não informado'))];
+  return {
+    total: lista.length, pela_qualificadora: qualificadora, apos_repasse: lista.length - qualificadora,
+    por_motivo: motivos.map(m => ({ motivo: m, qualificadora: mQ[m] || 0, expansao: mE[m] || 0 })),
+  };
+}
+function diaRankingUtm(iso, col) {
+  const leads = (D.ranking.detalhe_leads || []).filter(x => x.data === iso);
+  const cc1 = (D.ranking.detalhe_cc1 || []).filter(x => x.data === iso);
+  const leadsCount = {}, cc1Count = {};
+  leads.forEach(x => { const v = x[col]; if (v) leadsCount[v] = (leadsCount[v] || 0) + 1; });
+  cc1.forEach(x => { const v = x[col]; if (v) cc1Count[v] = (cc1Count[v] || 0) + 1; });
+  const nomes = new Set([...Object.keys(leadsCount), ...Object.keys(cc1Count)]);
+  const itens = [...nomes].map(nome => {
+    const leadsN = leadsCount[nome] || 0, cc1N = cc1Count[nome] || 0;
+    return { nome, leads: leadsN, cc1: cc1N, conversao: leadsN ? Math.round(1000 * cc1N / leadsN) / 10 : null };
+  });
+  const melhores = itens.filter(i => i.cc1 > 0).sort((a, b) => (b.cc1 - a.cc1) || ((b.conversao || 0) - (a.conversao || 0))).slice(0, 5);
+  let piores = itens.filter(i => i.leads >= 3);
+  if (!piores.length) piores = itens.filter(i => i.leads >= 1);
+  piores = piores.sort((a, b) => ((a.conversao ?? 999) - (b.conversao ?? 999)) || (a.cc1 - b.cc1)).slice(0, 5);
+  return { melhores, piores };
+}
+function marcarBadgesDia(txt) {
+  ['dia-badge-placar', 'dia-badge-consolidado', 'dia-badge-perdidos', 'dia-badge-ranking',
+   'dia-badge-metas', 'dia-badge-agendadores', 'dia-badge-heatmap', 'dia-badge-fpq'].forEach(id => {
+    const el = document.getElementById(id + '-' + sufixo);
+    if (el) el.textContent = txt || '';
+  });
+}
+function aplicarFiltroDia(iso) {
+  const dia = diaSomaMetricas(iso);
+  renderScoreboard({
+    contratos_fechados: dia.contratos,
+    contratos_fechados_franquia: dia.contratos_franquia,
+    contratos_fechados_partner: dia.contratos_partner,
+    venda_realizada_total: dia.venda,
+    caixa_realizado_total: dia.caixa,
+  }, sufixo, true);
+  renderFunnel('funnel-consolidado-' + sufixo, dia);
+  renderPerdidosCard(diaPerdidos(iso));
+  renderRankingCard({ campanhas: diaRankingUtm(iso, 'utm_campanha'), criativos: diaRankingUtm(iso, 'utm_criativo') });
+  renderMetas(true, dia);
+  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores.map(a => agendadorDiaMetricas(a, iso)), true);
+  renderHeatmap(heatmapMatrizDia(iso));
+  fpqDiaFiltro = iso;
+  fpqRenderTable(fpqCloserFilter.value);
+  marcarBadgesDia('— dia ' + fmtDate(iso));
+}
+function limparFiltroDia() {
+  renderScoreboard(D.scoreboard, sufixo, false);
+  renderFunnel('funnel-consolidado-' + sufixo, D.consolidado);
+  renderPerdidosCard(D.perdidos);
+  renderRankingCard(D.ranking);
+  renderMetas(false);
+  if (D.agendadores && D.agendadores.length) renderAgendadores(D.agendadores, false);
+  renderHeatmap(D.heatmap_cc1.matriz);
+  fpqDiaFiltro = null;
+  fpqRenderTable(fpqCloserFilter.value);
+  marcarBadgesDia('');
+}
+
+// ===== Mapa de calor — horários de CC1 (dias no topo, horas na lateral, estilo agenda) =====
+function renderHeatmap(matriz) {
+  const { dias, horas } = D.heatmap_cc1;
+  const max = Math.max(1, ...matriz.flat());
+  const cols = dias.length;
+  const cellsHtml = [];
+  cellsHtml.push(`<div></div>`);
+  dias.forEach(dia => cellsHtml.push(`<div class="heatmap-day">${dia}</div>`));
+  horas.forEach((h, hIdx) => {
+    const horaLbl = String(h).padStart(2, '0') + 'h';
+    cellsHtml.push(`<div class="heatmap-hour">${horaLbl}</div>`);
+    dias.forEach((dia, i) => {
+      const v = matriz[i][hIdx];
+      const alpha = v === 0 ? 0 : 0.15 + 0.75 * (v / max);
+      const style = v === 0
+        ? `background: var(--card-hi);`
+        : `background: rgba(213,174,119,${alpha.toFixed(2)});`;
+      cellsHtml.push(`<div class="heatmap-cell${v === 0 ? ' empty' : ''}" style="${style}" title="${dia} ${horaLbl}">${v || ''}</div>`);
+    });
+  });
+  document.getElementById('heatmap-cc1-' + sufixo).innerHTML = `
+    <div class="heatmap-wrap">
+      <div class="heatmap-grid" style="grid-template-columns: 60px repeat(${cols}, 1fr);">
+        ${cellsHtml.join('')}
+      </div>
+    </div>`;
+}
+renderHeatmap(D.heatmap_cc1.matriz);
+function heatmapMatrizDia(iso) {
+  const { dias, horas, detalhe } = D.heatmap_cc1;
+  const m = dias.map(() => horas.map(() => 0));
+  const wd = (new Date(iso + 'T00:00:00').getDay() + 6) % 7; // 0 = segunda
+  if (wd > 4) return m; // mapa só cobre seg-sex
+  (detalhe || []).filter(x => x.data === iso).forEach(x => {
+    const hIdx = horas.indexOf(x.hora);
+    if (hIdx >= 0) m[wd][hIdx]++;
+  });
+  return m;
+}
+
+initRelatorioPorCloser(D, sufixo, titulo, aplicarFiltroDia, limparFiltroDia);
 
 renderPrevisaoTable(D, sufixo);
 const fpqTbody = document.querySelector('#fpq-table-' + sufixo + ' tbody');
@@ -1954,6 +2003,14 @@ if (_funisMulti) {
   const _dadosGeral = D.funis[0].dados;
   renderScoreboard(_dadosGeral.scoreboard, 'geral', false);
   renderPrevisaoTable(_dadosGeral, 'geral');
+  renderFunnel('funnel-consolidado-geral', _dadosGeral.consolidado_geral);
+  initRelatorioPorCloser({
+    closers: _dadosGeral.closers_geral,
+    consolidado: _dadosGeral.consolidado_geral,
+    relatorio_metrics: _dadosGeral.relatorio_metrics_geral,
+    periodo_inicio: _dadosGeral.periodo_inicio,
+    periodo_fim: _dadosGeral.periodo_fim,
+  }, 'geral', 'Visão Geral');
 }
 document.getElementById('funis-container').innerHTML = D.funis.map(f => funilBlockHtml(f, _funisMulti)).join('');
 D.funis.forEach(f => montarFunil(f.dados, f.sufixo, f.titulo));

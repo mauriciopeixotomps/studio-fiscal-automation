@@ -301,7 +301,11 @@
        real da área imprimível (A4 paisagem 297mm - 2×4mm de margem = 289mm)
        pra todo mundo que depende da largura do container (grid, tabela,
        max-width) calcular certo. */
-    html, body { width: 289mm !important; background: var(--bg) !important; }
+    /* A regra acima só define a LARGURA — sem margin:auto, a caixa de 289mm
+       fica grudada na borda esquerda da folha (html/body não centralizam
+       filho de largura fixa sozinhos), sobrando um vão vazio à direita em
+       toda página (achado real no PDF exportado, 05/11/2026). */
+    html, body { width: 289mm !important; margin: 0 auto !important; background: var(--bg) !important; }
     .page-nav-link, .export-btn, #month-nav-link, #paginas-irmas-nav, #historico-select { display: none !important; }
     body { padding: 6px; }
     .card { margin-bottom: 10px; padding: 12px; }

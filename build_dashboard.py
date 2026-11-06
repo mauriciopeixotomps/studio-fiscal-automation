@@ -279,9 +279,15 @@ for a in config.AGENDADORES:
     agendamento_deal_ids = set(_cc1_a['negocio_id'].dropna()) if not _cc1_a.empty else set()
     _cc1_a_realizadas = _cc1_a[_cc1_a['done'] == True] if not _cc1_a.empty and 'done' in _cc1_a.columns else _cc1_a
     realizadas_ids = set(_cc1_a_realizadas['negocio_id'].dropna()) if not _cc1_a_realizadas.empty else set()
+    # CC1 que o agendador criou e ainda não aconteceu (done=False) — pedido
+    # do time (06/11/2026): mostrar quanto já está agendado esperando
+    # acontecer, não só o que já realizou.
+    _cc1_a_futura = _cc1_a[_cc1_a['done'] != True] if not _cc1_a.empty and 'done' in _cc1_a.columns else _cc1_a.iloc[0:0]
+    futura_ids = set(_cc1_a_futura['negocio_id'].dropna()) if not _cc1_a_futura.empty else set()
     no_show_ids = agendamento_deal_ids & _no_show_deal_ids
     n_agendamentos = len(agendamento_deal_ids)
     realizadas_n = len(realizadas_ids)
+    futura_n = len(futura_ids)
     no_show_n = len(no_show_ids)
     # Granularidade diária de tudo acima — pra "Ver o dia" (Relatório por
     # closer) também filtrar o Time de agendamento, não só o resto da página
@@ -293,6 +299,9 @@ for a in config.AGENDADORES:
         'leads_recebidos': leads_dia,
         'agendamentos': _contar_por_dia(agendamento_deal_ids, _dia_by_dealid(_cc1_a, 'negocio_id', 'add_time')),
         'realizadas': _contar_por_dia(realizadas_ids, _dia_by_dealid(_cc1_a_realizadas, 'negocio_id', 'marked_as_done_time')),
+        # Dia aqui é quando a CC1 está MARCADA pra acontecer (due_date), não
+        # quando foi criada — mesmo padrão do "cc1_futura" dos closers.
+        'a_acontecer': _contar_por_dia(futura_ids, _dia_by_dealid(_cc1_a_futura, 'negocio_id', 'due_date')),
         'no_show': _contar_por_dia(no_show_ids, _no_show_dia_by_deal),
     }
     meta_agendamentos = leads_n * config.META_AGENDAMENTO_PCT
@@ -307,6 +316,7 @@ for a in config.AGENDADORES:
         'leads_recebidos': int(leads_n),
         'agendamentos': n_agendamentos,
         'realizadas': realizadas_n,
+        'a_acontecer': futura_n,
         'no_show': no_show_n,
         'pct_agendamento': pct(n_agendamentos, leads_n),
         'pct_realizada': pct(realizadas_n, n_agendamentos),
@@ -644,6 +654,11 @@ def build_page(*, pipeline_ids, deals_p, stages_contrato_enviado, leads_mode, me
         'cc1': {
             'label': 'CC1 realizada', 'meta': meta_cc1_calc, 'estimado': True,
             'daily': daily_cc1, 'ideal_cumulative': ideal_cumulative(meta_cc1_calc, n_dias_uteis_total),
+            # Quantas reuniões já estão agendadas esperando acontecer —
+            # pedido do time (06/11/2026), mesmo número que já aparecia no
+            # card "Metas do mês" (consolidado['cc1_futura']), só reaproveitado
+            # aqui pra aparecer também no gráfico de Ritmo.
+            'futura': consolidado['cc1_futura'],
         },
         'fpq': {
             'label': 'FPQ recebida', 'meta': meta_fpq_calc, 'estimado': True,

@@ -647,6 +647,7 @@ ${cabecalho}
         <thead>
           <tr>
             <th>Agendador</th><th>Leads recebidos</th><th>Agendamentos</th><th>% agendamento</th>
+            <th>CC1 a acontecer</th>
             <th>Realizadas</th><th>% realizada</th><th>No-show</th><th>% no-show</th>
             <th>Faltam p/ meta</th>
           </tr>
@@ -1646,6 +1647,7 @@ document.getElementById('pace-grid-' + sufixo).innerHTML = Object.keys(D.pace).m
       <span><i class="sw" style="border-top-color:${color}"></i>Realizado hoje <b>${realHoje}</b></span>
       ${idealHoje !== null ? `<span><i class="sw dash"></i>Ideal hoje <b>${idealHoje}</b></span>` : ''}
       ${diffTxt !== null ? `<span class="diff-tag ${diffCls}">${diffTxt}</span>` : ''}
+      ${p.futura !== undefined ? `<span><b>${p.futura}</b> a acontecer</span>` : ''}
     </div>
     <div class="pace-chart"><canvas id="pace-canvas-${key}-${sufixo}"></canvas></div>
   </div>
@@ -1961,9 +1963,10 @@ function agendadorDiaMetricas(a, iso) {
   const leads = (a.diario.leads_recebidos || {})[iso] || 0;
   const ag = (a.diario.agendamentos || {})[iso] || 0;
   const real = (a.diario.realizadas || {})[iso] || 0;
+  const aAcontecer = (a.diario.a_acontecer || {})[iso] || 0;
   const noShow = (a.diario.no_show || {})[iso] || 0;
   return {
-    nome: a.nome, leads_recebidos: leads, agendamentos: ag, realizadas: real, no_show: noShow,
+    nome: a.nome, leads_recebidos: leads, agendamentos: ag, realizadas: real, a_acontecer: aAcontecer, no_show: noShow,
     pct_agendamento: leads ? Math.round(1000 * ag / leads) / 10 : null,
     pct_realizada: ag ? Math.round(1000 * real / ag) / 10 : null,
     pct_no_show: ag ? Math.round(1000 * noShow / ag) / 10 : null,
@@ -1991,6 +1994,7 @@ function renderAgendadores(lista, diaMode) {
       <td>${a.leads_recebidos}</td>
       <td>${a.agendamentos}</td>
       ${pctCell(a.pct_agendamento, D.agendadores_meta && D.agendadores_meta.meta_agendamento_pct)}
+      <td>${a.a_acontecer}</td>
       <td>${a.realizadas}</td>
       ${pctCell(a.pct_realizada, D.agendadores_meta && D.agendadores_meta.meta_realizada_pct)}
       <td>${a.no_show}</td>
@@ -2002,10 +2006,10 @@ function renderAgendadores(lista, diaMode) {
 
   // Total do time — mesmas contas de cada linha, só que em cima da soma bruta
   // (não a média dos %), igual o "Total da equipe" do Relatório por closer.
-  const t = { leads_recebidos: 0, agendamentos: 0, realizadas: 0, no_show: 0, faltam_agendamentos: 0, faltam_realizadas: 0 };
+  const t = { leads_recebidos: 0, agendamentos: 0, realizadas: 0, a_acontecer: 0, no_show: 0, faltam_agendamentos: 0, faltam_realizadas: 0 };
   lista.forEach(a => {
     t.leads_recebidos += a.leads_recebidos; t.agendamentos += a.agendamentos;
-    t.realizadas += a.realizadas; t.no_show += a.no_show;
+    t.realizadas += a.realizadas; t.a_acontecer += a.a_acontecer || 0; t.no_show += a.no_show;
     t.faltam_agendamentos += a.faltam_agendamentos || 0; t.faltam_realizadas += a.faltam_realizadas || 0;
   });
   t.pct_agendamento = t.leads_recebidos ? Math.round(1000 * t.agendamentos / t.leads_recebidos) / 10 : null;
@@ -2021,6 +2025,7 @@ function renderAgendadores(lista, diaMode) {
       <td>${t.leads_recebidos}</td>
       <td>${t.agendamentos}</td>
       ${pctCell(t.pct_agendamento, D.agendadores_meta && D.agendadores_meta.meta_agendamento_pct)}
+      <td>${t.a_acontecer}</td>
       <td>${t.realizadas}</td>
       ${pctCell(t.pct_realizada, D.agendadores_meta && D.agendadores_meta.meta_realizada_pct)}
       <td>${t.no_show}</td>

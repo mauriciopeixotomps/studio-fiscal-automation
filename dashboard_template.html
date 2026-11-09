@@ -189,6 +189,10 @@
   .funnel-fill { height: 100%; border-radius: 6px; background: var(--accent); }
   .funnel-val { text-align: right; font-weight: 600; }
   .funnel-conv { text-align: right; font-size: 12px; color: var(--green); }
+  /* Linha extra (quantas CC1 ainda estão agendadas esperando acontecer) —
+     cai numa linha implícita por baixo do track/val, sem bagunçar as 4
+     colunas normais da linha do funil. */
+  .funnel-extra { grid-column: 2 / 4; font-size: 11px; color: var(--text-dim); margin-top: -4px; }
 
   /* ===== Relatório por closer ===== */
   .relatorio-card + .relatorio-card { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
@@ -1501,18 +1505,21 @@ function funnelStages(m, soLeadsEcc1) {
   // realizada" — sem a etapa de qualificação, que só existe no Inbound e não
   // faz sentido misturada com um total de 4 funis (dava conversão >100%,
   // achado real 09/11/2026).
+  // 4º item de cada linha (opcional) = quantas ainda estão agendadas esperando
+  // acontecer — só faz sentido pra CC1 (m.cc1_futura), pedido do time
+  // (09/11/2026): "incluir quantas reuniões pra acontecer também" no funil.
   const pre = m.leads_qualificados === undefined ? (
     soLeadsEcc1 ? [
       ['Leads iniciados', m.leads, undefined],
-      ['CC1 realizada', m.cc1_realizada, convPct(m.cc1_realizada, m.leads)],
+      ['CC1 realizada', m.cc1_realizada, convPct(m.cc1_realizada, m.leads), m.cc1_futura],
     ] : [
-      ['CC1 realizada', m.cc1_realizada, undefined],
+      ['CC1 realizada', m.cc1_realizada, undefined, m.cc1_futura],
     ]
   ) : [
     ['Leads iniciados', m.leads, undefined],
     ['Leads qualificados', m.leads_qualificados, convPct(m.leads_qualificados, m.leads)],
     ['Agendado', m.cc1_agendado, convPct(m.cc1_agendado, m.leads_qualificados)],
-    ['Realizado', m.cc1_realizada, convPct(m.cc1_realizada, m.cc1_agendado)],
+    ['Realizado', m.cc1_realizada, convPct(m.cc1_realizada, m.cc1_agendado), m.cc1_futura],
   ];
   return [
     ...pre,
@@ -1535,12 +1542,13 @@ function renderFunnel(elId, m, soLeadsEcc1) {
   const stages = funnelStages(m, soLeadsEcc1);
   const max = Math.max(1, ...stages.map(s => s[1]));
   const el = document.getElementById(elId);
-  el.innerHTML = stages.map(([label, val, conv]) => `
+  el.innerHTML = stages.map(([label, val, conv, futura]) => `
     <div class="funnel-row">
       <div class="funnel-label">${label}</div>
       <div class="funnel-track"><div class="funnel-fill" style="width:${100 * val / max}%"></div></div>
       <div class="funnel-val">${val}</div>
       <div class="funnel-conv">${conv === undefined ? '' : 'conv. ' + pctStr(conv)}</div>
+      ${futura === undefined ? '' : `<div class="funnel-extra">+${futura} a acontecer</div>`}
     </div>
   `).join('');
 }

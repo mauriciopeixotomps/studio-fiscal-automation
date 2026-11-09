@@ -1083,11 +1083,20 @@ consolidado_geral['conversao'] = {
     'cc2_para_cc3': pct(consolidado_geral['cc3_realizada'], consolidado_geral['cc2_realizada']),
 }
 consolidado_geral['pct_no_show'] = pct(consolidado_geral['no_show'], consolidado_geral['cc1_realizada'] + consolidado_geral['no_show'])
-# "Leads qualificados"/"Agendado" só existem no funil do Inbound (é o time de
-# qualificação/SDR que faz isso, não um conceito que exista em Outbound/
-# Rebarba/Fenalaw) — pega direto do Inbound em vez de somar.
-consolidado_geral['leads_qualificados'] = inbound_data['consolidado']['leads_qualificados']
-consolidado_geral['cc1_agendado'] = inbound_data['consolidado']['cc1_agendado']
+# Propositalmente NÃO copia "leads_qualificados"/"cc1_agendado" do Inbound
+# pra cá (como uma versão antiga deste código fazia) — são etapas só do
+# funil do Inbound (o time de Qualificação/SDR não existe pros outros 3
+# funis) e, pior, misturar o valor absoluto do Inbound com o "leads" daqui
+# (soma dos 4 funis) gerava conversão > 100% sem sentido ("Agendado 11 conv
+# 73.3%" vindo só do Inbound, "Realizado 19 conv 172.7%" porque 19 > 11).
+# Achado real (09/11/2026): usuário comparou "26" aqui com "320" do card
+# Metas do mês e achou que uma das duas estava errada — na real são métricas
+# diferentes (Metas do mês = todo lead que entra no Inbound, independente de
+# já ter closer dono; "leads" aqui = soma, por closer, dos negócios que CADA
+# closer já levou a CC1 ou assumiu como dono, nos 4 funis). O funil geral
+# agora pula direto de "Leads iniciados" pra "CC1 realizada" (ver
+# funnelStages(m, true) em dashboard_template.html), sem a etapa de
+# qualificação no meio.
 
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
 # Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM

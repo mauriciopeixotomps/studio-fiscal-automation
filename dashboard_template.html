@@ -506,7 +506,7 @@ function geralBlockHtml() {
   </div>
 
   <div class="card">
-    <h2>Consolidado do time <span class="hint">— funil Leads iniciados → Leads qualificados → Agendado → Realizado → FPQ → CC2 → CC3 → Contrato enviado → Fechado, somando Inbound, Rebarba, Outbound e Fenalaw</span></h2>
+    <h2>Consolidado do time <span class="hint">— funil Leads iniciados → CC1 realizada → FPQ → CC2 → CC3 → Contrato enviado → Fechado, somando Inbound, Rebarba, Outbound e Fenalaw. "Leads iniciados" aqui é a soma, por closer, dos negócios que cada um já levou a CC1 ou assumiu como dono nos 4 funis — diferente do "Negócios iniciados Studio Fiscal" do card Metas do mês, que conta todo lead que entra no Inbound, com ou sem closer ainda</span></h2>
     <div id="funnel-consolidado-geral" class="funnel"></div>
   </div>
 
@@ -1492,14 +1492,23 @@ document.getElementById('relatorio-export-' + sufixo).addEventListener('click', 
 function convPct(val, base) {
   return base ? Math.round(1000 * val / base) / 10 : null;
 }
-function funnelStages(m) {
+function funnelStages(m, soLeadsEcc1) {
   // "Leads qualificados"/"Agendado"/"Realizado" só existem no consolidado do
   // Inbound (m.leads_qualificados) — no comparativo por closer o funil continua
   // começando em "CC1 realizada" (a qualificação é feita pelo time de
-  // qualificação, não por um closer específico).
-  const pre = m.leads_qualificados === undefined ? [
-    ['CC1 realizada', m.cc1_realizada, undefined],
-  ] : [
+  // qualificação, não por um closer específico). O geral (soLeadsEcc1) mostra
+  // "Leads iniciados" (soma por closer dos 4 funis) mas pula direto pra "CC1
+  // realizada" — sem a etapa de qualificação, que só existe no Inbound e não
+  // faz sentido misturada com um total de 4 funis (dava conversão >100%,
+  // achado real 09/11/2026).
+  const pre = m.leads_qualificados === undefined ? (
+    soLeadsEcc1 ? [
+      ['Leads iniciados', m.leads, undefined],
+      ['CC1 realizada', m.cc1_realizada, convPct(m.cc1_realizada, m.leads)],
+    ] : [
+      ['CC1 realizada', m.cc1_realizada, undefined],
+    ]
+  ) : [
     ['Leads iniciados', m.leads, undefined],
     ['Leads qualificados', m.leads_qualificados, convPct(m.leads_qualificados, m.leads)],
     ['Agendado', m.cc1_agendado, convPct(m.cc1_agendado, m.leads_qualificados)],
@@ -1522,8 +1531,8 @@ function funnelStages(m) {
     ]),
   ];
 }
-function renderFunnel(elId, m) {
-  const stages = funnelStages(m);
+function renderFunnel(elId, m, soLeadsEcc1) {
+  const stages = funnelStages(m, soLeadsEcc1);
   const max = Math.max(1, ...stages.map(s => s[1]));
   const el = document.getElementById(elId);
   el.innerHTML = stages.map(([label, val, conv]) => `
@@ -2047,7 +2056,7 @@ if (_funisMulti) {
   const _dadosGeral = D.funis[0].dados;
   renderScoreboard(_dadosGeral.scoreboard, 'geral', false);
   renderPrevisaoTable(_dadosGeral, 'geral');
-  renderFunnel('funnel-consolidado-geral', _dadosGeral.consolidado_geral);
+  renderFunnel('funnel-consolidado-geral', _dadosGeral.consolidado_geral, true);
   initRelatorioPorCloser({
     closers: _dadosGeral.closers_geral,
     consolidado: _dadosGeral.consolidado_geral,

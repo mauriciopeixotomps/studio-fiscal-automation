@@ -1090,13 +1090,30 @@ consolidado_geral['pct_no_show'] = pct(consolidado_geral['no_show'], consolidado
 # (soma dos 4 funis) gerava conversão > 100% sem sentido ("Agendado 11 conv
 # 73.3%" vindo só do Inbound, "Realizado 19 conv 172.7%" porque 19 > 11).
 # Achado real (09/11/2026): usuário comparou "26" aqui com "320" do card
-# Metas do mês e achou que uma das duas estava errada — na real são métricas
+# Metas do mês e achou que uma das duas estava errada — na real eram métricas
 # diferentes (Metas do mês = todo lead que entra no Inbound, independente de
 # já ter closer dono; "leads" aqui = soma, por closer, dos negócios que CADA
 # closer já levou a CC1 ou assumiu como dono, nos 4 funis). O funil geral
 # agora pula direto de "Leads iniciados" pra "CC1 realizada" (ver
 # funnelStages(m, true) em dashboard_template.html), sem a etapa de
 # qualificação no meio.
+#
+# Pedido seguinte do usuário (09/11/2026): quer o funil geral mostrando
+# "tudo que entrou de lead" de verdade (igual o Metas do mês faz pro
+# Inbound), não a soma por closer — "leads" continua como estava acima
+# (produtividade por closer, usada pelo "Total da equipe" do Relatório por
+# closer geral, que soma as linhas de cima) porque trocar esse valor
+# deixaria o Total da equipe maior que a soma das linhas dos 3 closers.
+# leads_total_funil é só pro funil visual: soma de cada funil o PRÓPRIO
+# consolidado['leads'] (que pro Inbound já é o "Negócios iniciados Studio
+# Fiscal" independente de dono — 320 — e pros outros 3, que usam
+# leads_mode='criado', já é equivalente: todo negócio criado no funil no
+# mês, também sem exigir dono — ver override em consolidado['leads'] dentro
+# de build_page()).
+consolidado_geral['leads_total_funil'] = (
+    inbound_data['consolidado']['leads'] + outbound_data['consolidado']['leads']
+    + rebarba_data['consolidado']['leads'] + fenalaw_data['consolidado']['leads']
+)
 
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
 # Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM

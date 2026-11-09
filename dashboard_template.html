@@ -506,7 +506,7 @@ function geralBlockHtml() {
   </div>
 
   <div class="card">
-    <h2>Consolidado do time <span class="hint">— funil Leads iniciados → CC1 realizada → FPQ → CC2 → CC3 → Contrato enviado → Fechado, somando Inbound, Rebarba, Outbound e Fenalaw. "Leads iniciados" aqui é a soma, por closer, dos negócios que cada um já levou a CC1 ou assumiu como dono nos 4 funis — diferente do "Negócios iniciados Studio Fiscal" do card Metas do mês, que conta todo lead que entra no Inbound, com ou sem closer ainda</span></h2>
+    <h2>Consolidado do time <span class="hint">— funil Leads iniciados → CC1 realizada → FPQ → CC2 → CC3 → Contrato enviado → Fechado, somando Inbound, Rebarba, Outbound e Fenalaw. "Leads iniciados" aqui é tudo que entrou nos 4 funis no mês, com ou sem closer ainda (inclui o "Negócios iniciados Studio Fiscal" do Metas do mês, que é só a parte do Inbound) — não confundir com a coluna "Negócios iniciados" do Relatório por closer logo abaixo, que é por closer</span></h2>
     <div id="funnel-consolidado-geral" class="funnel"></div>
   </div>
 
@@ -2056,7 +2056,12 @@ if (_funisMulti) {
   const _dadosGeral = D.funis[0].dados;
   renderScoreboard(_dadosGeral.scoreboard, 'geral', false);
   renderPrevisaoTable(_dadosGeral, 'geral');
-  renderFunnel('funnel-consolidado-geral', _dadosGeral.consolidado_geral, true);
+  // "Leads iniciados" do funil usa leads_total_funil (tudo que entrou nos 4
+  // funis, sem precisar de dono ainda) — diferente do consolidado_geral.leads
+  // (soma por closer, usado pelo "Total da equipe" do Relatório por closer
+  // geral logo abaixo, que não pode mudar ou o total passa a não bater com
+  // a soma das linhas de cima). Cópia rasa só pra essa renderização.
+  renderFunnel('funnel-consolidado-geral', { ..._dadosGeral.consolidado_geral, leads: _dadosGeral.consolidado_geral.leads_total_funil }, true);
   initRelatorioPorCloser({
     closers: _dadosGeral.closers_geral,
     consolidado: _dadosGeral.consolidado_geral,

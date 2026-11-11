@@ -1240,6 +1240,10 @@ function renderPrevisaoTable(D, sufixo) {
     </tr>
   `).join('');
   const previsaoQuentes = D.previsao.filter(r => confiancaCategoria(confiancaEfetiva(r)) === 'quente' && !previsaoPerdido(r) && r.deal_status !== 'won' && !previsaoProximoMes(r));
+  // Pedido do time (11/11/2026): contar quantos são Franquia (tem valor) x
+  // Partner (de graça) em cada Previsão — já existia "Total Partner (grátis)",
+  // faltava o espelho "Total Franquia".
+  const previsaoFranquia = D.previsao.filter(r => r.tipo_contrato === 'franquia');
   const previsaoPartner = D.previsao.filter(r => r.tipo_contrato === 'partner');
   // Uma linha "Total {Funil}" por funil presente — só faz sentido quando a lista
   // junta mais de um (Inbound a partir de 01/09/2026); nas páginas que só têm o
@@ -1253,6 +1257,7 @@ function renderPrevisaoTable(D, sufixo) {
   document.querySelector('#previsao-table-' + sufixo + ' tfoot').innerHTML = D.previsao.length ? (
     previsaoEmNegociacaoFechadoRowsHtml(D.previsao) +
     linhasPorFunil +
+    previsaoTotalRowHtml('Total Franquia', previsaoFranquia) +
     previsaoTotalRowHtml('Total Partner (grátis)', previsaoPartner) +
     previsaoTotalRowHtml('Total só Quentes', previsaoQuentes) +
     previsaoTotalRowHtml('Total geral', D.previsao, true) +

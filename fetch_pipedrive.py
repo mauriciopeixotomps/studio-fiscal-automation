@@ -217,6 +217,29 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
             if a.get('created_by_user_id') in config.AGENDADOR_IDS
             and _in_range(a.get('add_time'), config.MONTH_START, config.MONTH_END)
         ]
+        # 'raw' só tem CC1 cujo DONO é um dos closers (busca acima é por
+        # user_id=closer_id) — mas a CC1 criada por um agendador às vezes fica
+        # com ele mesmo como dono (ainda não repassada pro closer) ou com
+        # alguém fora da lista atual de closers, e nesses casos some do "Time
+        # de agendamento" (achado 11/11/2026, comparando com o Insight nativo
+        # do Pipedrive). Busca de novo com user_id=0 ("todo mundo", mesmo
+        # truque da Qualificação Realizada abaixo) só pra pegar essa sobra.
+        _cc1_qualquer_dono_raw = fetch_all('activities', {
+            'type': config.ACT_CC1,
+            'user_id': 0,
+            'start_date': config.FETCH_START.isoformat(),
+            'end_date': config.FETCH_END.isoformat(),
+        })
+        _cc1_dono_fora_dos_closers = [
+            _correct_activity_tz(a) for a in _cc1_qualquer_dono_raw
+            if a.get('user_id') not in config.CLOSER_IDS
+        ]
+        _ids_ja_incluidos = {a.get('negocio_id') for a in cc1_criadas_agendador_rows}
+        for a in _cc1_dono_fora_dos_closers:
+            if (a.get('created_by_user_id') in config.AGENDADOR_IDS
+                    and _in_range(a.get('add_time'), config.MONTH_START, config.MONTH_END)
+                    and a.get('deal_id') not in _ids_ja_incluidos):
+                cc1_criadas_agendador_rows.append({**act_row(a), 'criador_nome': AGENDADOR_NOME.get(a.get('created_by_user_id'))})
     print(f'   {stage_key} realizada: {len(realizada)}')
     if tem_futura:
         futura = [act_row(a) for a in raw
@@ -442,11 +465,66 @@ with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                 'agendador_nome': AGENDADOR_NOME.get(agendador_id),
                 'pipeline_id': d.get('pipeline_id'),
                 'add_time': _fix_dt(d.get('add_time')),
-                # Usado só pra descartar lead REATRIBUÍDO de outro SDR (o dono
-                # mudou muito tempo depois de criado) da contagem de "leads
-                # recebidos" do dono atual — ver build_dashboard.py.
+                # update_time NÃO é usado mais pra decidir reatribuição (ver
+                # 'reatribuido_em' logo abaixo) — causava falso positivo, pois
+                # muda em QUALQUER edição do negócio (etapa, nota, status),
+                # não só quando o dono muda. Mantido só de referência/debug.
                 'update_time': _fix_dt(d.get('update_time')),
             })
+
+
+# "update_time" bem depois do "add_time" NÃO quer dizer que o negócio foi
+# reatribuído — ele muda em qualquer edição do negócio (mudança de etapa,
+# status, nota, atividade vinculada etc.), bug encontrado em 11/11/2026: 13
+# negócios de um único agendador, criados e TRABALHADOS POR ELE MESMO o mês
+# inteiro (nunca mudaram de dono), ficavam de fora de "leads recebidos" só
+# porque alguém avançou a etapa deles mais de 7 dias depois de criados.
+# Verifica de verdade no changelog do negócio (field_key='user_id') se o DONO
+# mudou — só roda pra quem tem add_time no mês E o gap update/add > 7 dias
+# (candidato), pra não multiplicar a chamada por milhares de negócios à toa.
+def _fetch_deal_owner_change(deal_id):
+    url = f'{BASE}/deals/{deal_id}/flow?api_token={TOKEN}&limit=200'
+    for attempt in range(4):
+        try:
+            with urllib.request.urlopen(url, timeout=30) as r:
+                body = json.loads(r.read())
+            items = body.get('data') or []
+            changes = [
+                i['data'] for i in items
+                if i.get('object') == 'dealChange' and i.get('data', {}).get('field_key') == 'user_id'
+            ]
+            if not changes:
+                return deal_id, None
+            ultima = max(changes, key=lambda c: c.get('log_time') or '')
+            return deal_id, _fix_dt(ultima.get('log_time'))
+        except Exception:
+            if attempt == 3:
+                return deal_id, None
+            time.sleep(2 * (attempt + 1))
+    return deal_id, None
+
+
+candidatos_ids = set()
+for row in agendadores_deals_rows:
+    if not _in_range(row['add_time'], config.MONTH_START, config.MONTH_END):
+        continue
+    at, ut = row.get('add_time'), row.get('update_time')
+    if not at or not ut:
+        continue
+    gap = (pd.to_datetime(ut) - pd.to_datetime(at)).days
+    if abs(gap) > 7:
+        candidatos_ids.add(row['deal_id'])
+
+print(f'-> Verificando reatribuição real de {len(candidatos_ids)} negócio(s) candidato(s) (update_time > 7 dias do add_time)...')
+reatribuido_em_by_deal = {}
+if candidatos_ids:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        for deal_id, quando in executor.map(_fetch_deal_owner_change, candidatos_ids):
+            reatribuido_em_by_deal[deal_id] = quando
+
+for row in agendadores_deals_rows:
+    row['reatribuido_em'] = reatribuido_em_by_deal.get(row['deal_id'])
+
 pd.DataFrame(agendadores_deals_rows).to_excel(os.path.join(OUT_DIR, 'deals_agendadores.xlsx'), index=False)
 n_leads = df_deals['add_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)).sum() if len(df_deals) else 0
 won_no_mes_mask = (df_deals['status'] == 'won') & df_deals['won_time'].apply(lambda x: _in_range(x, config.MONTH_START, config.MONTH_END)) if len(df_deals) else pd.Series(dtype=bool)

@@ -261,10 +261,15 @@ for a in config.AGENDADORES:
         # dele à toa. Caso real (19/10/2026): 337 negócios transferidos de
         # Leonardo Soares pra Jonatans Junior de uma vez (bulk update
         # confirmado no histórico do Pipedrive), 5 deles criados em outubro.
-        if 'update_time' in _dd.columns:
-            update_time_dt = pd.to_datetime(_dd['update_time'], errors='coerce')
-            gap_dias = (update_time_dt - add_time_dt).dt.days
-            nao_reatribuido = gap_dias.isna() | (gap_dias.abs() <= 7)
+        # Usa 'reatribuido_em' (changelog real do negócio, campo user_id —
+        # ver fetch_pipedrive.py) em vez do update_time do negócio: update_time
+        # muda em QUALQUER edição (etapa, status, nota...), não só quando o
+        # dono muda, e isso excluía negócio que nunca trocou de dono só por
+        # ter ficado mais de 7 dias parado na MESMA pessoa (achado 11/11/2026).
+        if 'reatribuido_em' in _dd.columns:
+            reatribuido_dt = pd.to_datetime(_dd['reatribuido_em'], errors='coerce')
+            gap_dias = (reatribuido_dt - add_time_dt).dt.days
+            nao_reatribuido = reatribuido_dt.isna() | (gap_dias.abs() <= 7)
         else:
             nao_reatribuido = True
         _dd['add_time'] = add_time_dt.dt.date

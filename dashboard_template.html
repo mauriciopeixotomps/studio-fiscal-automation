@@ -515,6 +515,22 @@ function geralBlockHtml() {
   </div>
 
   <div class="card">
+    <h2>FPQs recebidas <span class="hint">— soma Inbound, Rebarba, Outbound e Fenalaw juntos; clique em "ver" pra abrir o negócio no Pipedrive e ler a FPQ completa</span></h2>
+    <div class="relatorio-sort" style="margin-bottom:12px">
+      <label for="fpq-closer-filter-geral">Closer</label>
+      <select id="fpq-closer-filter-geral"></select>
+    </div>
+    <div style="overflow-x:auto">
+      <table id="fpq-table-geral">
+        <thead>
+          <tr><th>Data</th><th>Closer</th><th>Funil</th><th>Lead</th><th>FPQ</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card">
     <h2>Relatório por closer <span class="hint">— soma Inbound, Rebarba, Outbound e Fenalaw juntos, por closer</span></h2>
     <div class="relatorio-toolbar">
       <div class="relatorio-tabs" id="relatorio-tabs-global-geral">
@@ -2082,6 +2098,28 @@ if (_funisMulti) {
     periodo_inicio: _dadosGeral.periodo_inicio,
     periodo_fim: _dadosGeral.periodo_fim,
   }, 'geral', 'Visão Geral');
+  const fpqGeralTbody = document.querySelector('#fpq-table-geral tbody');
+  function fpqGeralRenderTable(closerFiltro) {
+    const rows = closerFiltro
+      ? _dadosGeral.fpqs_recebidas_geral.filter(r => r.closer_nome === closerFiltro)
+      : _dadosGeral.fpqs_recebidas_geral;
+    fpqGeralTbody.innerHTML = rows.length ? rows.map(r => {
+      const [dataPart, horaPart] = r.data.split(' ');
+      return `
+      <tr>
+        <td>${fmtDate(dataPart)}${horaPart ? ' ' + horaPart : ''}</td>
+        <td>${r.closer_nome || '—'}</td>
+        <td>${r.funil}</td>
+        <td>${r.pessoa_nome || r.negocio_titulo || '—'}</td>
+        <td>${r.deal_link ? `<a class="link" href="${r.deal_link}" target="_blank">ver</a>` : '—'}</td>
+      </tr>`;
+    }).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text-dim)">Nenhuma FPQ recebida no mês</td></tr>';
+  }
+  const fpqGeralCloserFilter = document.getElementById('fpq-closer-filter-geral');
+  fpqGeralCloserFilter.innerHTML = '<option value="">Todos</option>' +
+    _dadosGeral.closers_geral.map(c => `<option value="${c.nome}">${c.nome}</option>`).join('');
+  fpqGeralCloserFilter.addEventListener('change', () => fpqGeralRenderTable(fpqGeralCloserFilter.value));
+  fpqGeralRenderTable('');
 }
 document.getElementById('funis-container').innerHTML = D.funis.map(f => funilBlockHtml(f, _funisMulti)).join('');
 D.funis.forEach(f => montarFunil(f.dados, f.sufixo, f.titulo));

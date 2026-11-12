@@ -1140,6 +1140,19 @@ consolidado_geral['leads_total_funil'] = (
     + rebarba_data['consolidado']['leads'] + fenalaw_data['consolidado']['leads']
 )
 
+# "FPQs recebidas" (lista) juntando os 4 funis — a lista em si (ao contrário dos
+# totais numéricos acima) só existia por funil (build_page()), então uma FPQ de
+# um negócio do Fenalaw (ou Outbound/Rebarba) não aparecia em lugar nenhum perto
+# do "Consolidado do time" geral, só lá embaixo na seção do próprio funil —
+# achado 12/11/2026 (usuário comparando FPQ do Ricardo Chiaraba/Raquel Calzado,
+# negócios do Fenalaw, com o painel). Cada linha ganha 'funil' pra dar pra
+# diferenciar já que agora pode ter negócio de mais de um funil na mesma lista.
+fpqs_recebidas_geral = []
+for _fd, _funil_label in zip(_funis_para_geral, ('INBOUND', 'OUTBOUND', 'REBARBA', 'FENALAW')):
+    for _r in _fd.get('fpqs_recebidas', []):
+        fpqs_recebidas_geral.append({**_r, 'funil': _funil_label})
+fpqs_recebidas_geral.sort(key=lambda r: r['data'], reverse=True)
+
 # ============= ARQUIVAMENTO AUTOMÁTICO DE MÊS FECHADO =============
 # Todo ciclo (mesmo os automáticos, sem ninguém olhando) grava o mês corrente TAMBÉM
 # num arquivo próprio (ex: agosto-2026.html), além do index.html normal — com os
@@ -1268,6 +1281,7 @@ dados_inbound = {
     # Relatório por closer somando Inbound+Rebarba+Outbound+Fenalaw juntos.
     'consolidado_geral': consolidado_geral,
     'closers_geral': closers_geral,
+    'fpqs_recebidas_geral': fpqs_recebidas_geral,
     'relatorio_hint_geral': '— soma Inbound, Rebarba, Outbound e Fenalaw juntos, por closer',
     'relatorio_metrics_geral': [
         ['leads', 'Negócios iniciados'],

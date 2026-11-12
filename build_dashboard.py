@@ -43,7 +43,9 @@ deals_p72 = load('deals_pipeline72.xlsx')  # FENALAW 2026 (compartilhado com a A
 deals_produtos = load('deals_produtos.xlsx')  # tipo_contrato: 'franquia' (tem valor) / 'partner' (de graça)
 previsao = load('previsao.xlsx')
 deals_agendadores = load('deals_agendadores.xlsx')  # negócio do agendador em QUALQUER pipeline
-agendadores_cc1_criadas = load('agendadores_cc1_criadas.xlsx')  # CC1 (qualquer funil) criada por um agendador
+agendadores_cc1_criadas = load('agendadores_cc1_criadas.xlsx')  # CC1 (qualquer funil) criada por um agendador — só usado pra "CC1 a acontecer"
+agendadores_agendamentos = load('agendadores_agendamentos.xlsx')  # atividade dedicada "Agendamento de CC1"/"...bot"
+cc1_realizada_qualquer_dono = load('cc1_realizada_qualquer_dono.xlsx')  # CC1 realizada, qualquer dono/pipeline (cruzar c/ agendamentos)
 qualificacao_re = load('activities_qualificacao_realizada.xlsx')
 no_show_re = load('activities_no_show.xlsx')
 
@@ -204,12 +206,22 @@ if not previsao.empty:
 # conta — em vez de depender de alguém preencher a planilha com o link certo.
 
 # ============= TIME DE AGENDAMENTO (SDRs dedicados à Studio Fiscal) =============
-# "Agendamentos"/"Realizadas" vêm direto do criador da CC1 (agendadores_cc1_criadas,
-# ver fetch_pipedrive.py) — qualquer funil da Fiscal, não só o pipeline 62 (pedido
-# do time, 05/11/2026: o agendador pode criar a CC1 em qualquer funil, e antes só
-# contava quando a CC1 realizada acabava caindo no 62). "No-show" segue a mesma
-# lógica: cruza com o negócio do agendamento, sem mais restringir ao 62.
-_no_show_deal_ids = set(no_show_re['negocio_id'].dropna()) if not no_show_re.empty and 'negocio_id' in no_show_re.columns else set()
+# "Agendamentos"/"Realizadas"/"No-show" voltam a cruzar pelo negócio da atividade
+# dedicada "Agendamento de CC1"/"...bot" (agendadores_agendamentos) — revertido em
+# 11/11/2026, a pedido do usuário: o painel nativo de Insights do Pipedrive que o
+# time usa todo dia ("Agendamento de CC1") é feito em cima dessa atividade
+# dedicada, não do criador da CC1 em si (método usado entre 05/11 e 11/11/2026) —
+# bateu exatamente (31 agendamentos de Jonatans Junior no mês, conferido ao vivo)
+# voltando pro método antigo.
+# "Realizadas" cruza com CC1 Realizada de QUALQUER dono/pipeline
+# (cc1_realizada_qualquer_dono, ver fetch_pipedrive.py) — a restrição a pipeline
+# 62 do método antigo original também perdia CC1 realizada num funil diferente
+# (mesmo problema que motivou o 05/11, só que no lado da REALIZAÇÃO, não da
+# criação — achado 11/11/2026 comparando com o Insight "CC1 Realizada - SDR":
+# batia 15 sem a restrição de pipeline, 14 com ela).
+_no_show_p62 = no_show_re[no_show_re['pipeline_id'] == config.PIPELINE_STUDIO_FISCAL_FRANQUIA] if not no_show_re.empty and 'pipeline_id' in no_show_re.columns else no_show_re
+_cc1_realizado_deal_ids = set(cc1_realizada_qualquer_dono['negocio_id'].dropna()) if not cc1_realizada_qualquer_dono.empty and 'negocio_id' in cc1_realizada_qualquer_dono.columns else set()
+_no_show_deal_ids = set(_no_show_p62['negocio_id'].dropna()) if not _no_show_p62.empty and 'negocio_id' in _no_show_p62.columns else set()
 
 
 def _dia_by_dealid(df, deal_col, date_col):
@@ -225,7 +237,9 @@ def _dia_by_dealid(df, deal_col, date_col):
     return out
 
 
-_no_show_dia_by_deal = _dia_by_dealid(no_show_re, 'negocio_id', 'marked_as_done_time')
+_agendamento_dia_by_deal = _dia_by_dealid(agendadores_agendamentos, 'negocio_id', 'marked_as_done_time')
+_cc1_dia_by_deal = _dia_by_dealid(cc1_realizada_qualquer_dono, 'negocio_id', 'marked_as_done_time')
+_no_show_dia_by_deal = _dia_by_dealid(_no_show_p62, 'negocio_id', 'marked_as_done_time')
 
 
 def _contar_por_dia(deal_ids, dia_by_deal):
@@ -277,17 +291,25 @@ for a in config.AGENDADORES:
         leads_n = int(len(_dd_mes))
         for d in _dd_mes['add_time']:
             leads_dia[d.isoformat()] = leads_dia.get(d.isoformat(), 0) + 1
-    # "Agendamentos" = toda CC1 (qualquer status, qualquer funil) que ESTE
-    # agendador criou no mês; "Realizadas" = a parte dessas já concluída
-    # (done) — ver fetch_pipedrive.py, cc1_criadas_agendador_rows.
-    _cc1_a = agendadores_cc1_criadas[agendadores_cc1_criadas['criador_id'] == a['id']] if not agendadores_cc1_criadas.empty and 'criador_id' in agendadores_cc1_criadas.columns else agendadores_cc1_criadas
-    agendamento_deal_ids = set(_cc1_a['negocio_id'].dropna()) if not _cc1_a.empty else set()
-    _cc1_a_realizadas = _cc1_a[_cc1_a['done'] == True] if not _cc1_a.empty and 'done' in _cc1_a.columns else _cc1_a
-    realizadas_ids = set(_cc1_a_realizadas['negocio_id'].dropna()) if not _cc1_a_realizadas.empty else set()
-    # CC1 que o agendador criou e ainda não aconteceu (done=False) — pedido
-    # do time (06/11/2026): mostrar quanto já está agendado esperando
-    # acontecer, não só o que já realizou.
-    _cc1_a_futura = _cc1_a[_cc1_a['done'] != True] if not _cc1_a.empty and 'done' in _cc1_a.columns else _cc1_a.iloc[0:0]
+    # "Agendamentos" = atividade dedicada "Agendamento de CC1"/"...bot" que ESTE
+    # agendador concluiu no mês; "Realizadas" cruza esse negócio com a CC1
+    # Realizada do pipeline 62 já buscada pros closers (a CC1 em si fica na
+    # agenda do closer, não do agendador) — método antigo, revertido em
+    # 11/11/2026 (ver comentário acima).
+    agendamento_deal_ids = set()
+    if not agendadores_agendamentos.empty and 'agendador_id' in agendadores_agendamentos.columns:
+        agendamento_deal_ids = set(
+            agendadores_agendamentos.loc[agendadores_agendamentos['agendador_id'] == a['id'], 'negocio_id'].dropna()
+        )
+    realizadas_ids = agendamento_deal_ids & _cc1_realizado_deal_ids
+    # "CC1 a acontecer" continua pelo criador da CC1 em si (qualquer funil —
+    # pedido do time, 05/11/2026), não pela atividade dedicada: é a única
+    # forma de saber que meeting ainda não aconteceu, já que a atividade
+    # "Agendamento de CC1" não tem noção de "futura" (só marca que o SDR já
+    # fez a tarefa de agendar, não quando a reunião em si vai rolar).
+    _cc1_a_futura = agendadores_cc1_criadas[
+        (agendadores_cc1_criadas['criador_id'] == a['id']) & (agendadores_cc1_criadas['done'] != True)
+    ] if not agendadores_cc1_criadas.empty and 'criador_id' in agendadores_cc1_criadas.columns else agendadores_cc1_criadas.iloc[0:0]
     futura_ids = set(_cc1_a_futura['negocio_id'].dropna()) if not _cc1_a_futura.empty else set()
     no_show_ids = agendamento_deal_ids & _no_show_deal_ids
     n_agendamentos = len(agendamento_deal_ids)
@@ -297,13 +319,11 @@ for a in config.AGENDADORES:
     # Granularidade diária de tudo acima — pra "Ver o dia" (Relatório por
     # closer) também filtrar o Time de agendamento, não só o resto da página
     # (pedido do time, 16/09/2026: "não aparece" o histórico do SDR num
-    # período específico). "Agendamentos" usa o dia em que a CC1 foi CRIADA
-    # (add_time — mesmo critério que define o universo do mês); "Realizadas"
-    # usa o dia em que ela foi de fato concluída (marked_as_done_time).
+    # período específico).
     diario_agendador = {
         'leads_recebidos': leads_dia,
-        'agendamentos': _contar_por_dia(agendamento_deal_ids, _dia_by_dealid(_cc1_a, 'negocio_id', 'add_time')),
-        'realizadas': _contar_por_dia(realizadas_ids, _dia_by_dealid(_cc1_a_realizadas, 'negocio_id', 'marked_as_done_time')),
+        'agendamentos': _contar_por_dia(agendamento_deal_ids, _agendamento_dia_by_deal),
+        'realizadas': _contar_por_dia(realizadas_ids, _cc1_dia_by_deal),
         # Dia aqui é quando a CC1 está MARCADA pra acontecer (due_date), não
         # quando foi criada — mesmo padrão do "cc1_futura" dos closers.
         'a_acontecer': _contar_por_dia(futura_ids, _dia_by_dealid(_cc1_a_futura, 'negocio_id', 'due_date')),

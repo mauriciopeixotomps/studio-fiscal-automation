@@ -230,8 +230,9 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
             'start_date': config.FETCH_START.isoformat(),
             'end_date': config.FETCH_END.isoformat(),
         })
+        _cc1_qualquer_dono_corrigido = [_correct_activity_tz(a) for a in _cc1_qualquer_dono_raw]
         _cc1_dono_fora_dos_closers = [
-            _correct_activity_tz(a) for a in _cc1_qualquer_dono_raw
+            a for a in _cc1_qualquer_dono_corrigido
             if a.get('user_id') not in config.CLOSER_IDS
         ]
         _ids_ja_incluidos = {a.get('negocio_id') for a in cc1_criadas_agendador_rows}
@@ -240,6 +241,18 @@ for stage_key, act_type, tem_futura in ACT_STAGES:
                     and _in_range(a.get('add_time'), config.MONTH_START, config.MONTH_END)
                     and a.get('deal_id') not in _ids_ja_incluidos):
                 cc1_criadas_agendador_rows.append({**act_row(a), 'criador_nome': AGENDADOR_NOME.get(a.get('created_by_user_id'))})
+        # "Realizadas" do Time de agendamento (cruza com o negocio_id do
+        # agendamento, ver bloco AGENDADORES) precisa da CC1 Realizada de
+        # QUALQUER dono e QUALQUER pipeline — 'cc1_realizada_rows' (closer_id
+        # em CLOSER_IDS) e a restrição a pipeline 62 de antes perdiam CC1 que
+        # o próprio SDR (ou alguém fora da lista de closers) também concluiu,
+        # ou que rolou num funil diferente (achado 11/11/2026, comparando com
+        # o Insight "CC1 Realizada - SDR" do Pipedrive). Usa o MESMO
+        # '_cc1_qualquer_dono_corrigido' já buscado acima, sem filtrar por dono.
+        cc1_realizada_qualquer_dono_rows = [
+            act_row(a) for a in _cc1_qualquer_dono_corrigido
+            if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END)
+        ]
     print(f'   {stage_key} realizada: {len(realizada)}')
     if tem_futura:
         futura = [act_row(a) for a in raw
@@ -363,6 +376,56 @@ pd.DataFrame(qualificacao_rows).to_excel(os.path.join(OUT_DIR, 'activities_quali
 # pipeline) mais abaixo, não de uma atividade.
 pd.DataFrame(cc1_criadas_agendador_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_cc1_criadas.xlsx'), index=False)
 print(f'   CC1 criadas por agendadores no mês (qualquer funil): {len(cc1_criadas_agendador_rows)}')
+pd.DataFrame(cc1_realizada_qualquer_dono_rows).to_excel(os.path.join(OUT_DIR, 'cc1_realizada_qualquer_dono.xlsx'), index=False)
+print(f'   CC1 realizada no mês (qualquer dono/pipeline, p/ cruzar com agendamentos): {len(cc1_realizada_qualquer_dono_rows)}')
+
+# "Agendamentos"/"Realizadas" (painel "Time de agendamento") voltam a usar a
+# atividade dedicada "Agendamento de CC1"/"...bot" — não mais o criador da
+# CC1 em si (revertido em 11/11/2026, a pedido do usuário: o painel nativo
+# de Insights do Pipedrive que o time olha todo dia usa essa atividade
+# dedicada, e bateu exatamente com ela ao conferir ao vivo — 31 pra Jonatans
+# Junior no mês). 'agendadores_cc1_criadas.xlsx' acima continua existindo só
+# pra alimentar "CC1 a acontecer" (ver build_dashboard.py).
+print('-> Fetching atividades dos agendadores (agendamento de CC1 dedicado)...')
+
+
+def _fetch_agendador_agendamento(act_type, agendador_id):
+    rows = fetch_all('activities', {
+        'type': act_type,
+        'user_id': agendador_id,
+        'start_date': config.FETCH_START.isoformat(),
+        'end_date': config.FETCH_END.isoformat(),
+    })
+    return act_type, agendador_id, rows
+
+
+_agendamento_tasks = [
+    (act_type, aid)
+    for act_type in (config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)
+    for aid in config.AGENDADOR_IDS
+]
+_agendamento_raw = {act_type: [] for act_type in (config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT)}
+with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    futures = [executor.submit(_fetch_agendador_agendamento, act_type, aid) for act_type, aid in _agendamento_tasks]
+    for f in concurrent.futures.as_completed(futures):
+        act_type, agendador_id, rows = f.result()
+        _agendamento_raw[act_type].extend(rows)
+        print(f'   {act_type} / {AGENDADOR_NOME.get(agendador_id)}: {len(rows)}')
+
+agendamento_rows = []
+for act_type in (config.ACT_AGENDAMENTO_CC1, config.ACT_AGENDAMENTO_CC1_BOT):
+    for a in _agendamento_raw[act_type]:
+        a = _correct_activity_tz(a)
+        if a.get('done') and _in_range(a.get('marked_as_done_time'), config.MONTH_START, config.MONTH_END):
+            agendamento_rows.append({
+                'agendador_id': a.get('user_id'),
+                'agendador_nome': AGENDADOR_NOME.get(a.get('user_id')),
+                'negocio_id': a.get('deal_id'),
+                'tipo': act_type,
+                'marked_as_done_time': a.get('marked_as_done_time'),
+            })
+pd.DataFrame(agendamento_rows).to_excel(os.path.join(OUT_DIR, 'agendadores_agendamentos.xlsx'), index=False)
+print(f'   agendamentos de CC1 concluídos no mês (todos agendadores): {len(agendamento_rows)}')
 
 # ============= DEALS (leads + contratos) =============
 print('-> Fetching deals por closer (proprietário)...')

@@ -18,6 +18,12 @@ else
     exit 1
 fi
 
+# Identidade do autor do commit — via env var (GIT_AUTHOR_NAME/GIT_AUTHOR_EMAIL,
+# setadas por quem roda o script) em vez de fixa no código; sem elas, cai num
+# nome genérico de bot (não expõe e-mail pessoal nenhum).
+GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-Dashboard Bot}"
+GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-dashboard-bot@users.noreply.github.com}"
+
 # 1) Build dashboard
 echo "→ Build dashboard..."
 cd "$WORKDIR" && python3 build_dashboard.py
@@ -50,14 +56,17 @@ cp "$PUBLISH/rebarba.html" .
 # corrente a cada ciclo (fica "viva" até o mês virar) e nunca toca nas de meses
 # já passados, que ficam congeladas pra sempre no repo assim que o mês fecha.
 cp "$PUBLISH"/*-2026.html . 2>/dev/null || true
+# Página estática (não gerada pelo build, não muda todo ciclo) — busca os meses
+# publicados sozinha via fetch() no navegador de quem estiver vendo.
+cp "$WORKDIR/personalizado.html" . 2>/dev/null || true
 
 # 4) Commit & push (só se houver mudanças)
-git -c user.name="Mauricio Peixoto" -c user.email="mauricio.peixoto.mps@gmail.com" add -A
+git add -A
 if git diff --cached --quiet; then
     echo "= Sem mudanças. Nada a fazer."
 else
     MSG="${1:-Atualiza dashboard $(date +'%d/%m/%Y %H:%M')}"
-    git -c user.name="Mauricio Peixoto" -c user.email="mauricio.peixoto.mps@gmail.com" \
+    git -c user.name="$GIT_AUTHOR_NAME" -c user.email="$GIT_AUTHOR_EMAIL" \
         commit -q -m "$MSG"
     git push -q origin main
     echo "✓ Push concluído: $MSG"

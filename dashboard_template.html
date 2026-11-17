@@ -1388,7 +1388,7 @@ function relatorioBuildCards(order) {
   document.getElementById('relatorio-closers-' + sufixo).innerHTML = order.map((c, i) => `
     <div class="relatorio-card">
       <div class="relatorio-head">
-        <img src="${c.foto}" alt="${c.nome}">
+        <img src="${c.foto || ''}" alt="${c.nome}" onerror="this.onerror=null;this.src='data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22><circle cx=%2212%22 cy=%2212%22 r=%2212%22 fill=%22%23555%22/><circle cx=%2212%22 cy=%229%22 r=%224%22 fill=%22%23ccc%22/><path d=%22M4 22c0-4.4 3.6-8 8-8s8 3.6 8 8%22 fill=%22%23ccc%22/></svg>'">
         <div class="name">${c.nome}</div>
       </div>
       <div class="relatorio-table-wrap" id="relatorio-table-${i}-${sufixo}"></div>

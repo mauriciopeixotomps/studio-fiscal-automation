@@ -37,6 +37,18 @@ CLOSERS = [
         'apelidos_planilha': {'leo', 'leonardo'},
     },
     {
+        # Entrou em 16/11/2026, novo closer de Outbound (usuário Pipedrive
+        # criado no mesmo dia). Ainda sem foto de perfil no Pipedrive
+        # (icon_url vazio) — None aqui cai no fallback de avatar genérico do
+        # template (onerror do <img>, dashboard_template.html); trocar pela
+        # URL real assim que ele configurar uma foto lá.
+        'id': 27575273,
+        'nome': 'João Pedro Severo',
+        'email': 'joao.severo@grupostudio.com.br',
+        'foto': None,
+        'apelidos_planilha': {'joão', 'joao', 'joão severo', 'joao severo', 'severo'},
+    },
+    {
         'id': 23882023,
         'nome': 'Fred Garcia',
         'email': 'frederico.garcia@grupostudio.com.br',
